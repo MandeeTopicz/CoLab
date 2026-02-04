@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react"
 import { Link, useNavigate } from "react-router-dom"
 import { useApi } from "../../lib/api"
+import { useAuth } from "../../auth/AuthProvider"
 
 type Workspace = { workspaceId: string; name: string }
 type Board = { boardId: string; name: string; updatedAt: number }
@@ -8,6 +9,8 @@ type Board = { boardId: string; name: string; updatedAt: number }
 export function DashboardPage() {
   const api = useApi()
   const navigate = useNavigate()
+  const { logout } = useAuth()
+
   const [workspaces, setWorkspaces] = useState<Workspace[]>([])
   const [workspaceId, setWorkspaceId] = useState<string>("")
   const [boards, setBoards] = useState<Board[]>([])
@@ -33,6 +36,12 @@ export function DashboardPage() {
         setWorkspaceId(first)
       } catch (e: any) {
         if (!alive) return
+        if (e?.status === 401) {
+          setError("Your session expired. Please log in again.")
+          await logout()
+          navigate("/login", { replace: true })
+          return
+        }
         setError(e?.message || "Failed to load workspaces")
       } finally {
         if (alive) setLoading(false)
@@ -54,6 +63,12 @@ export function DashboardPage() {
         setBoards(res.boards)
       } catch (e: any) {
         if (!alive) return
+        if (e?.status === 401) {
+          setError("Your session expired. Please log in again.")
+          await logout()
+          navigate("/login", { replace: true })
+          return
+        }
         setError(e?.message || "Failed to load boards")
       }
     })()
@@ -62,7 +77,7 @@ export function DashboardPage() {
     }
   }, [workspaceId])
 
-  if (loading) return <div>Loading…</div>
+  if (loading) return <div className="text-sm text-text-secondary">Loading…</div>
 
   return (
     <div className="max-w-5xl">

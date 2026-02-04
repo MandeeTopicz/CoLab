@@ -59,6 +59,10 @@ export async function initFirebaseAnalytics() {
   if (analyticsInitAttempted) return
   analyticsInitAttempted = true
 
+  // Avoid noisy/blocked analytics config fetches in local dev.
+  if (!import.meta.env.PROD) return
+  if (!import.meta.env.VITE_FIREBASE_MEASUREMENT_ID) return
+
   try {
     const supported = await isSupported()
     if (!supported) return
