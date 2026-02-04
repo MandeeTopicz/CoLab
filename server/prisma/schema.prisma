@@ -1,0 +1,196 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  userId       String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String?
+  displayName  String
+  avatarUrl    String?
+  createdAt    DateTime @default(now())
+  lastLogin    DateTime?
+
+  memberships  WorkspaceMember[]
+  ownedBoards  Board[]            @relation("BoardOwner")
+  comments     Comment[]
+  activityLogs ActivityLog[]
+  invitationsSent Invitation[]    @relation("InvitationSender")
+  aiSessions   AiSession[]
+  boardVersions BoardVersion[]
+}
+
+model Workspace {
+  workspaceId String   @id @default(cuid())
+  name        String
+  createdAt   DateTime @default(now())
+
+  members WorkspaceMember[]
+  boards  Board[]
+}
+
+model WorkspaceMember {
+  workspaceId String
+  userId      String
+  role        String   @default("member")
+  createdAt   DateTime @default(now())
+
+  workspace Workspace @relation(fields: [workspaceId], references: [workspaceId], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [userId], onDelete: Cascade)
+
+  @@id([workspaceId, userId])
+}
+
+model Board {
+  boardId      String   @id @default(cuid())
+  workspaceId  String
+  name         String
+  ownerId      String
+  description  String?
+  privacy      String   @default("private")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  workspace Workspace @relation(fields: [workspaceId], references: [workspaceId], onDelete: Cascade)
+  owner     User      @relation("BoardOwner", fields: [ownerId], references: [userId], onDelete: Restrict)
+
+  objects      BoardObject[]
+  frames       Frame[]
+  sections     Section[]
+  comments     Comment[]
+  activityLogs ActivityLog[]
+  invitations  Invitation[]
+  aiSessions   AiSession[]
+  versions     BoardVersion[]
+  permissions  BoardPermission[]
+}
+
+model BoardPermission {
+  boardId String
+  userId  String
+  role    String
+
+  board Board @relation(fields: [boardId], references: [boardId], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [userId], onDelete: Cascade)
+
+  @@id([boardId, userId])
+}
+
+model BoardObject {
+  objectId   String   @id @default(cuid())
+  boardId    String
+  frameId    String?
+  sectionId  String?
+  type       String
+  content    Json
+  positionX  Float
+  positionY  Float
+  style      Json
+  locked     Boolean  @default(false)
+  createdBy  String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  board   Board   @relation(fields: [boardId], references: [boardId], onDelete: Cascade)
+  frame   Frame?  @relation(fields: [frameId], references: [frameId], onDelete: SetNull)
+  section Section? @relation(fields: [sectionId], references: [sectionId], onDelete: SetNull)
+}
+
+model Frame {
+  frameId   String   @id @default(cuid())
+  boardId   String
+  title     String
+  order     Int
+  locked    Boolean  @default(false)
+  color     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  board   Board        @relation(fields: [boardId], references: [boardId], onDelete: Cascade)
+  objects BoardObject[]
+  sections Section[]
+}
+
+model Section {
+  sectionId          String  @id @default(cuid())
+  boardId            String?
+  frameId            String?
+  title              String
+  helperText         String?
+  allowedObjectTypes Json
+  collapsed          Boolean @default(false)
+
+  board   Board?        @relation(fields: [boardId], references: [boardId], onDelete: Cascade)
+  frame   Frame?        @relation(fields: [frameId], references: [frameId], onDelete: Cascade)
+  objects BoardObject[]
+}
+
+model Comment {
+  commentId String   @id @default(cuid())
+  boardId   String
+  objectId  String?
+  userId    String?
+  content   String
+  resolved  Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  board Board @relation(fields: [boardId], references: [boardId], onDelete: Cascade)
+  user  User? @relation(fields: [userId], references: [userId], onDelete: SetNull)
+}
+
+model ActivityLog {
+  activityId String   @id @default(cuid())
+  boardId    String
+  userId     String?
+  action     String
+  target     String?
+  timestamp  DateTime @default(now())
+
+  board Board @relation(fields: [boardId], references: [boardId], onDelete: Cascade)
+  user  User? @relation(fields: [userId], references: [userId], onDelete: SetNull)
+}
+
+model Invitation {
+  inviteId       String   @id @default(cuid())
+  boardId        String
+  senderId       String?
+  recipientEmail String
+  status         String   @default("pending")
+  role           String   @default("viewer")
+  createdAt      DateTime @default(now())
+  expiresAt      DateTime?
+
+  board  Board @relation(fields: [boardId], references: [boardId], onDelete: Cascade)
+  sender User? @relation("InvitationSender", fields: [senderId], references: [userId], onDelete: SetNull)
+}
+
+model AiSession {
+  aiSessionId  String   @id @default(cuid())
+  boardId      String
+  userId       String?
+  functionName String
+  inputPayload Json
+  outputPayload Json
+  createdAt    DateTime @default(now())
+
+  board Board @relation(fields: [boardId], references: [boardId], onDelete: Cascade)
+  user  User? @relation(fields: [userId], references: [userId], onDelete: SetNull)
+}
+
+model BoardVersion {
+  versionId String   @id @default(cuid())
+  boardId   String
+  snapshot  Json
+  createdAt DateTime @default(now())
+  createdBy String?
+
+  board Board @relation(fields: [boardId], references: [boardId], onDelete: Cascade)
+  user  User? @relation(fields: [createdBy], references: [userId], onDelete: SetNull)
+}
+
