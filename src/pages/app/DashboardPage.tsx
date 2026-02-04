@@ -65,30 +65,22 @@ export function DashboardPage() {
   if (loading) return <div>Loading…</div>
 
   return (
-    <div style={{ maxWidth: 1100 }}>
-      <h1 style={{ marginTop: 0 }}>Dashboard</h1>
+    <div className="max-w-5xl">
+      <h1 className="text-2xl font-semibold text-text-primary">Dashboard</h1>
 
       {error && (
-        <div
-          style={{
-            padding: 10,
-            borderRadius: 10,
-            border: "1px solid rgba(239,68,68,0.7)",
-            background: "rgba(239,68,68,0.12)",
-            marginBottom: 12,
-          }}
-        >
+        <div className="mt-4 rounded-xl border border-danger/30 bg-danger/5 p-3 text-sm text-danger">
           {error}
         </div>
       )}
 
-      <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
-        <label>
-          <div style={{ fontWeight: 700, marginBottom: 6 }}>Workspace</div>
+      <div className="mt-6 flex flex-wrap items-end gap-4">
+        <label className="block">
+          <div className="text-sm font-semibold text-text-primary">Workspace</div>
           <select
             value={workspaceId}
             onChange={(e) => setWorkspaceId(e.target.value)}
-            style={{ padding: 10, borderRadius: 10 }}
+            className="mt-2 rounded-xl border border-border bg-surface px-3 py-2 text-sm text-text-primary shadow-xs focus:outline-none focus:ring-2 focus:ring-primary/30"
           >
             {workspaces.map((w) => (
               <option key={w.workspaceId} value={w.workspaceId}>
@@ -98,14 +90,14 @@ export function DashboardPage() {
           </select>
         </label>
 
-        <div style={{ flex: "1 1 260px" }}>
-          <div style={{ fontWeight: 700, marginBottom: 6 }}>Create a new board</div>
-          <div style={{ display: "flex", gap: 10 }}>
+        <div className="min-w-[260px] flex-1">
+          <div className="text-sm font-semibold text-text-primary">Create a new board</div>
+          <div className="mt-2 flex gap-2">
             <input
               value={newBoardName}
               onChange={(e) => setNewBoardName(e.target.value)}
               placeholder="Board name"
-              style={{ flex: 1, padding: 10, borderRadius: 10 }}
+              className="flex-1 rounded-xl border border-border bg-surface px-3 py-2 text-sm text-text-primary placeholder:text-text-muted shadow-xs focus:outline-none focus:ring-2 focus:ring-primary/30"
             />
             <button
               type="button"
@@ -115,6 +107,7 @@ export function DashboardPage() {
                 setNewBoardName("")
                 navigate(`/app/boards/${res.boardId}`)
               }}
+              className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-text-inverse shadow-sm hover:bg-primary-hover active:bg-primary-active transition-colors duration-fast"
             >
               Create
             </button>
@@ -122,39 +115,28 @@ export function DashboardPage() {
         </div>
       </div>
 
-      <div style={{ marginTop: 18, opacity: 0.85 }}>
-        Showing boards in <strong>{currentWorkspace?.name || "workspace"}</strong>
+      <div className="mt-6 text-sm text-text-secondary">
+        Showing boards in{" "}
+        <strong className="font-semibold text-text-primary">
+          {currentWorkspace?.name || "workspace"}
+        </strong>
       </div>
 
-      <div
-        style={{
-          marginTop: 12,
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))",
-          gap: 12,
-        }}
-      >
+      <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {boards.map((b) => (
           <Link
             key={b.boardId}
             to={`/app/boards/${b.boardId}`}
-            style={{
-              textDecoration: "none",
-              color: "inherit",
-              border: "1px solid rgba(255,255,255,0.14)",
-              borderRadius: 12,
-              padding: 14,
-              background: "rgba(255,255,255,0.05)",
-            }}
+            className="rounded-xl border border-border bg-surface p-4 shadow-xs transition-shadow duration-fast hover:shadow-sm"
           >
-            <div style={{ fontWeight: 800, marginBottom: 8 }}>{b.name}</div>
-            <div style={{ opacity: 0.8, fontSize: 12 }}>
+            <div className="text-base font-semibold text-text-primary">{b.name}</div>
+            <div className="mt-2 text-xs text-text-muted">
               Updated {new Date(b.updatedAt).toLocaleString()}
             </div>
           </Link>
         ))}
         {boards.length === 0 && (
-          <div style={{ opacity: 0.8 }}>No boards yet — create one above.</div>
+          <div className="text-sm text-text-muted">No boards yet — create one above.</div>
         )}
       </div>
     </div>

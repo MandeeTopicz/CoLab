@@ -1,4 +1,12 @@
-import { createContext, useCallback, useContext, useMemo, useState } from "react"
+import { createContext, useContext, useEffect, useMemo, useState } from "react"
+import {
+  createUserWithEmailAndPassword,
+  onIdTokenChanged,
+  signInWithEmailAndPassword,
+  signOut,
+  updateProfile,
+} from "firebase/auth"
+import { getFirebaseAuth } from "../lib/firebase"
 
 type AuthUser = {
   userId: string
@@ -9,53 +17,64 @@ type AuthUser = {
 type AuthState = {
   token: string | null
   user: AuthUser | null
+  isReady: boolean
 }
 
 type AuthContextValue = AuthState & {
-  setSession: (next: { token: string; user: AuthUser }) => void
-  logout: () => void
-}
-
-const STORAGE_KEY = "auth.session.v1"
-
-function loadInitial(): AuthState {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY)
-    if (!raw) return { token: null, user: null }
-    const parsed = JSON.parse(raw) as AuthState
-    if (typeof parsed?.token !== "string") return { token: null, user: null }
-    if (!parsed?.user) return { token: null, user: null }
-    return parsed
-  } catch {
-    return { token: null, user: null }
-  }
+  signup: (body: { email: string; password: string; displayName: string }) => Promise<void>
+  login: (body: { email: string; password: string }) => Promise<void>
+  logout: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null)
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [state, setState] = useState<AuthState>(() => loadInitial())
+  const [state, setState] = useState<AuthState>({
+    token: null,
+    user: null,
+    isReady: false,
+  })
 
-  const setSession = useCallback((next: { token: string; user: AuthUser }) => {
-    const newState: AuthState = { token: next.token, user: next.user }
-    setState(newState)
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(newState))
+  useEffect(() => {
+    const auth = getFirebaseAuth()
+    return onIdTokenChanged(auth, async (fbUser) => {
+      if (!fbUser) {
+        setState({ token: null, user: null, isReady: true })
+        return
+      }
+      const token = await fbUser.getIdToken()
+      setState({
+        token,
+        user: {
+          userId: fbUser.uid,
+          email: fbUser.email || "",
+          displayName: fbUser.displayName || fbUser.email || "User",
+        },
+        isReady: true,
+      })
+    })
   }, [])
 
-  const logout = useCallback(() => {
-    setState({ token: null, user: null })
-    localStorage.removeItem(STORAGE_KEY)
-  }, [])
-
-  const value = useMemo<AuthContextValue>(
-    () => ({
-      token: state.token,
-      user: state.user,
-      setSession,
-      logout,
-    }),
-    [state.token, state.user, setSession, logout]
-  )
+  const value = useMemo<AuthContextValue>(() => {
+    return {
+      ...state,
+      signup: async ({ email, password, displayName }) => {
+        const auth = getFirebaseAuth()
+        const cred = await createUserWithEmailAndPassword(auth, email, password)
+        await updateProfile(cred.user, { displayName })
+        await cred.user.getIdToken(true)
+      },
+      login: async ({ email, password }) => {
+        const auth = getFirebaseAuth()
+        const cred = await signInWithEmailAndPassword(auth, email, password)
+        await cred.user.getIdToken(true)
+      },
+      logout: async () => {
+        const auth = getFirebaseAuth()
+        await signOut(auth)
+      },
+    }
+  }, [state])
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }

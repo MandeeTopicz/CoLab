@@ -1,11 +1,9 @@
 import { useMemo, useState } from "react"
 import { Link, useNavigate, useSearchParams } from "react-router-dom"
 import { useAuth } from "../../auth/AuthProvider"
-import { useApi } from "../../lib/api"
 
 export function LoginPage() {
-  const api = useApi()
-  const { setSession } = useAuth()
+  const { login } = useAuth()
   const navigate = useNavigate()
   const [search] = useSearchParams()
 
@@ -17,72 +15,69 @@ export function LoginPage() {
   const [loading, setLoading] = useState(false)
 
   return (
-    <div style={{ maxWidth: 440, margin: "0 auto" }}>
-      <h1>Log in</h1>
-      <p style={{ opacity: 0.85 }}>
-        New here? <Link to="/signup">Create an account</Link>
-      </p>
+    <div className="mx-auto max-w-md">
+      <div className="rounded-2xl border border-border bg-surface p-6 shadow-md">
+        <h1 className="text-xl font-semibold text-text-primary">Log in</h1>
+        <p className="mt-2 text-sm text-text-secondary">
+          New here?{" "}
+          <Link className="font-semibold text-primary hover:text-primary-hover" to="/signup">
+            Create an account
+          </Link>
+        </p>
 
-      <form
-        onSubmit={async (e) => {
-          e.preventDefault()
-          setError(null)
-          setLoading(true)
-          try {
-            const res = await api.login({ email, password })
-            setSession({ token: res.token, user: res.user })
-            navigate(next, { replace: true })
-          } catch (err: any) {
-            setError(err?.message || "Login failed")
-          } finally {
-            setLoading(false)
-          }
-        }}
-        style={{
-          display: "flex",
-          flexDirection: "column",
-          gap: 10,
-          marginTop: 14,
-        }}
-      >
-        <label>
-          <div style={{ fontWeight: 700, marginBottom: 6 }}>Email</div>
-          <input
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            type="email"
-            required
-            style={{ width: "100%", padding: 10, borderRadius: 10 }}
-          />
-        </label>
-        <label>
-          <div style={{ fontWeight: 700, marginBottom: 6 }}>Password</div>
-          <input
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            type="password"
-            required
-            style={{ width: "100%", padding: 10, borderRadius: 10 }}
-          />
-        </label>
+        <form
+          onSubmit={async (e) => {
+            e.preventDefault()
+            setError(null)
+            setLoading(true)
+            try {
+              await login({ email, password })
+              navigate(next, { replace: true })
+            } catch (err: any) {
+              setError(err?.message || "Login failed")
+            } finally {
+              setLoading(false)
+            }
+          }}
+          className="mt-6 space-y-4"
+        >
+          <label className="block">
+            <div className="text-sm font-semibold text-text-primary">Email</div>
+            <input
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              type="email"
+              required
+              className="mt-2 w-full rounded-xl border border-border bg-surface px-3 py-2 text-sm text-text-primary placeholder:text-text-muted shadow-xs focus:outline-none focus:ring-2 focus:ring-primary/30"
+            />
+          </label>
 
-        {error && (
-          <div
-            style={{
-              padding: 10,
-              borderRadius: 10,
-              border: "1px solid rgba(239,68,68,0.7)",
-              background: "rgba(239,68,68,0.12)",
-            }}
+          <label className="block">
+            <div className="text-sm font-semibold text-text-primary">Password</div>
+            <input
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              type="password"
+              required
+              className="mt-2 w-full rounded-xl border border-border bg-surface px-3 py-2 text-sm text-text-primary placeholder:text-text-muted shadow-xs focus:outline-none focus:ring-2 focus:ring-primary/30"
+            />
+          </label>
+
+          {error && (
+            <div className="rounded-xl border border-danger/30 bg-danger/5 p-3 text-sm text-danger">
+              {error}
+            </div>
+          )}
+
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-text-inverse shadow-sm hover:bg-primary-hover active:bg-primary-active disabled:opacity-60 transition-colors duration-fast"
           >
-            {error}
-          </div>
-        )}
-
-        <button type="submit" disabled={loading} style={{ padding: 10, borderRadius: 10 }}>
-          {loading ? "Logging in..." : "Log in"}
-        </button>
-      </form>
+            {loading ? "Logging in..." : "Log in"}
+          </button>
+        </form>
+      </div>
     </div>
   )
 }

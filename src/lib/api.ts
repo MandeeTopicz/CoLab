@@ -1,13 +1,9 @@
 import { useAuth } from "../auth/AuthProvider"
 
 const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL ||
-  (import.meta.env.PROD ? "" : "http://localhost:3001")
+  import.meta.env.VITE_API_BASE_URL || (import.meta.env.PROD ? "" : "http://localhost:3001")
 
-export type ApiError = {
-  status: number
-  message: string
-}
+type ApiError = { status: number; message: string }
 
 async function request<T>(path: string, init: RequestInit): Promise<T> {
   const res = await fetch(`${API_BASE_URL}${path}`, {
@@ -19,48 +15,23 @@ async function request<T>(path: string, init: RequestInit): Promise<T> {
   })
 
   if (!res.ok) {
-    const message = await res.text().catch(() => "")
-    throw { status: res.status, message: message || res.statusText } satisfies ApiError
+    const text = await res.text().catch(() => "")
+    throw { status: res.status, message: text || res.statusText } satisfies ApiError
   }
-
   return (await res.json()) as T
 }
 
 export function useApi() {
   const { token } = useAuth()
+  const headers: HeadersInit | undefined = token ? { authorization: `Bearer ${token}` } : undefined
 
   return {
-    signup: (body: { email: string; password: string; displayName: string }) =>
-      request<{ token: string; user: any; workspaceId: string }>("/api/auth/signup", {
-        method: "POST",
-        body: JSON.stringify(body),
-      }),
-    login: (body: { email: string; password: string }) =>
-      request<{ token: string; user: any }>("/api/auth/login", {
-        method: "POST",
-        body: JSON.stringify(body),
-      }),
-    me: () =>
-      request<{ user: any }>("/api/me", {
-        method: "GET",
-        headers: { authorization: `Bearer ${token || ""}` },
-      }),
-    listWorkspaces: () =>
-      request<{ workspaces: any[] }>("/api/workspaces", {
-        method: "GET",
-        headers: { authorization: `Bearer ${token || ""}` },
-      }),
+    me: () => request<{ user: any }>("/api/me", { method: "GET", headers }),
+    listWorkspaces: () => request<{ workspaces: any[] }>("/api/workspaces", { method: "GET", headers }),
     createBoard: (body: { workspaceId: string; name: string }) =>
-      request<{ boardId: string }>("/api/boards", {
-        method: "POST",
-        headers: { authorization: `Bearer ${token || ""}` },
-        body: JSON.stringify(body),
-      }),
+      request<{ boardId: string }>("/api/boards", { method: "POST", headers, body: JSON.stringify(body) }),
     listBoards: (workspaceId: string) =>
-      request<{ boards: any[] }>(`/api/workspaces/${workspaceId}/boards`, {
-        method: "GET",
-        headers: { authorization: `Bearer ${token || ""}` },
-      }),
+      request<{ boards: any[] }>(`/api/workspaces/${workspaceId}/boards`, { method: "GET", headers }),
   }
 }
 

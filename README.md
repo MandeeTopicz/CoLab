@@ -1,4 +1,4 @@
-# Vite + React + TypeScript
+# CoLab
 
 A minimal React application built with Vite and TypeScript.
 

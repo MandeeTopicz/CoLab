@@ -1,6 +1,5 @@
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom"
 import { useAuth } from "../auth/AuthProvider"
-import "./appShell.css"
 
 export function AppLayout() {
   const { user, logout } = useAuth()
@@ -10,57 +9,118 @@ export function AppLayout() {
   const isBoardRoute = location.pathname.startsWith("/app/boards/")
 
   return (
-    <div className="app-shell">
-      <header className="app-topbar" data-board={isBoardRoute ? "true" : "false"}>
-        <div className="app-topbar-left">
-          <div className="app-logo" onClick={() => navigate("/app/dashboard")}>
-            Board
+    <div className="min-h-screen">
+      <header
+        className="sticky top-0 z-10 border-b border-border/80 bg-surface/90 backdrop-blur"
+        data-board={isBoardRoute ? "true" : "false"}
+      >
+        <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-3">
+          <div className="flex items-center gap-3">
+            <button
+              className="rounded-lg px-2 py-1 text-lg font-bold tracking-tight text-text-primary hover:bg-toolbar transition-colors duration-fast"
+              type="button"
+              onClick={() => navigate("/app/dashboard")}
+            >
+              CoLab
+            </button>
+            <button
+              className="hidden rounded-lg border border-border bg-surface px-3 py-2 text-sm font-semibold text-text-secondary shadow-xs hover:bg-toolbar transition-colors duration-fast md:inline-flex"
+              type="button"
+            >
+              Workspaces
+            </button>
           </div>
-          <button className="app-pill" type="button">
-            Workspaces
-          </button>
-          <input
-            className="app-search"
-            placeholder="Search boards..."
-            aria-label="Search boards"
-          />
-          <button className="app-primary" type="button">
-            Create board
-          </button>
-        </div>
-        <div className="app-topbar-right">
-          <NavLink to="/app/notifications" className="app-pill-link">
-            Notifications
-          </NavLink>
-          <NavLink to="/app/account" className="app-pill-link">
-            Account
-          </NavLink>
-          <span className="app-user">{user?.displayName || "User"}</span>
-          <button
-            type="button"
-            className="app-pill"
-            onClick={() => {
-              logout()
-              navigate("/")
-            }}
-          >
-            Log out
-          </button>
+
+          <div className="hidden flex-1 px-3 md:block">
+            <input
+              className="w-full rounded-xl border border-border bg-surface px-3 py-2 text-sm text-text-primary placeholder:text-text-muted shadow-xs focus:outline-none focus:ring-2 focus:ring-primary/30"
+              placeholder="Search boards..."
+              aria-label="Search boards"
+            />
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-text-inverse shadow-sm hover:bg-primary-hover active:bg-primary-active transition-colors duration-fast"
+              type="button"
+            >
+              Create board
+            </button>
+
+            <NavLink
+              to="/app/notifications"
+              className={({ isActive }) =>
+                [
+                  "rounded-lg px-3 py-2 text-sm font-semibold transition-colors duration-fast",
+                  isActive ? "bg-toolbar text-text-primary" : "text-text-secondary hover:bg-toolbar",
+                ].join(" ")
+              }
+            >
+              Notifications
+            </NavLink>
+            <NavLink
+              to="/app/account"
+              className={({ isActive }) =>
+                [
+                  "rounded-lg px-3 py-2 text-sm font-semibold transition-colors duration-fast",
+                  isActive ? "bg-toolbar text-text-primary" : "text-text-secondary hover:bg-toolbar",
+                ].join(" ")
+              }
+            >
+              Account
+            </NavLink>
+
+            <span className="hidden text-sm text-text-secondary md:inline">
+              {user?.displayName || "User"}
+            </span>
+            <button
+              type="button"
+              className="rounded-lg px-3 py-2 text-sm font-semibold text-text-secondary hover:bg-toolbar transition-colors duration-fast"
+              onClick={() => {
+                logout()
+                navigate("/")
+              }}
+            >
+              Log out
+            </button>
+          </div>
         </div>
       </header>
 
       {isBoardRoute ? (
-        <main className="app-board">
+        <main className="relative h-[calc(100vh-57px)]">
           <Outlet />
         </main>
       ) : (
-        <div className="app-body">
-          <aside className="app-sidebar" aria-label="App navigation">
-            <NavLink to="/app/dashboard">Dashboard</NavLink>
-            <NavLink to="/app/workspace-settings">Workspace settings</NavLink>
+        <div className="mx-auto grid min-h-[calc(100vh-57px)] max-w-7xl grid-cols-1 md:grid-cols-[240px_1fr]">
+          <aside className="border-b border-border/80 bg-surface px-4 py-4 md:border-b-0 md:border-r">
+            <nav className="flex gap-2 md:flex-col" aria-label="App navigation">
+              <NavLink
+                to="/app/dashboard"
+                className={({ isActive }) =>
+                  [
+                    "rounded-lg px-3 py-2 text-sm font-semibold transition-colors duration-fast",
+                    isActive ? "bg-toolbar text-text-primary" : "text-text-secondary hover:bg-toolbar",
+                  ].join(" ")
+                }
+              >
+                Dashboard
+              </NavLink>
+              <NavLink
+                to="/app/workspace-settings"
+                className={({ isActive }) =>
+                  [
+                    "rounded-lg px-3 py-2 text-sm font-semibold transition-colors duration-fast",
+                    isActive ? "bg-toolbar text-text-primary" : "text-text-secondary hover:bg-toolbar",
+                  ].join(" ")
+                }
+              >
+                Workspace settings
+              </NavLink>
+            </nav>
           </aside>
 
-          <main className="app-content">
+          <main className="px-4 py-6">
             <Outlet />
           </main>
         </div>

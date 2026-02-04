@@ -24,23 +24,16 @@ export class ErrorBoundary extends Component<Props, State> {
     if (this.state.error) {
       if (this.props.fallback) return this.props.fallback(this.state.error)
       return (
-        <div style={{ padding: 18, maxWidth: 860, margin: "0 auto" }}>
-          <h1 style={{ marginTop: 0 }}>Something went wrong</h1>
-          <p style={{ opacity: 0.85 }}>
-            The board UI crashed. Check the browser console for details.
-          </p>
-          <pre
-            style={{
-              whiteSpace: "pre-wrap",
-              padding: 12,
-              borderRadius: 12,
-              border: "1px solid rgba(255,255,255,0.14)",
-              background: "rgba(0,0,0,0.25)",
-              overflow: "auto",
-            }}
-          >
-            {String(this.state.error?.message || this.state.error)}
-          </pre>
+        <div className="mx-auto max-w-3xl px-4 py-10">
+          <div className="rounded-2xl border border-border bg-surface p-6 shadow-md">
+            <h1 className="text-xl font-semibold text-text-primary">Something went wrong</h1>
+            <p className="mt-2 text-sm text-text-secondary">
+              The board UI crashed. Check the browser console for details.
+            </p>
+            <pre className="mt-4 max-h-[50vh] overflow-auto whitespace-pre-wrap rounded-xl border border-border bg-toolbar p-3 text-xs text-text-secondary">
+              {String(this.state.error?.message || this.state.error)}
+            </pre>
+          </div>
         </div>
       )
     }

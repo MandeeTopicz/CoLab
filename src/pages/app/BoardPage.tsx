@@ -10,25 +10,19 @@ function isRecord(v: unknown): v is Record<string, unknown> {
 
 function sanitizeInitialData(raw: unknown) {
   if (!isRecord(raw)) return null
-
   const elements = Array.isArray(raw.elements) ? raw.elements : []
   const files = (isRecord(raw.files) ? raw.files : {}) as any
-
   const appStateRaw = isRecord(raw.appState) ? raw.appState : {}
 
-  // IMPORTANT:
-  // Excalidraw's appState contains non-serializable fields (e.g. collaborators: Map).
-  // Persisting and restoring the full appState can crash the app on load.
-  // Only keep a safe, minimal subset here.
+  // Only keep JSON-safe subset. Excalidraw appState has non-serializable fields (e.g. collaborators: Map).
   const viewBackgroundColor =
     typeof appStateRaw.viewBackgroundColor === "string"
       ? appStateRaw.viewBackgroundColor
-      : "#1f1f1f"
+      : "#ffffff"
 
   const gridModeEnabled = Boolean(appStateRaw.gridModeEnabled)
   const zenModeEnabled = Boolean(appStateRaw.zenModeEnabled)
-  const theme =
-    typeof appStateRaw.theme === "string" ? appStateRaw.theme : undefined
+  const theme = typeof appStateRaw.theme === "string" ? appStateRaw.theme : undefined
 
   const appState = {
     viewBackgroundColor,
@@ -44,10 +38,7 @@ export function BoardPage() {
   const { boardId } = useParams()
   const containerRef = useRef<HTMLDivElement | null>(null)
 
-  const persistenceKey = useMemo(() => {
-    // Local persistence per board (MVP). We’ll switch to server-backed persistence + realtime next.
-    return `board:${boardId || "unknown"}`
-  }, [boardId])
+  const persistenceKey = useMemo(() => `board:${boardId || "unknown"}`, [boardId])
 
   const [initialData] = useState(() => {
     try {
@@ -59,9 +50,9 @@ export function BoardPage() {
     }
   })
 
-  const [gridModeEnabled, setGridModeEnabled] = useState<boolean>(() => {
-    return Boolean(initialData?.appState?.gridModeEnabled)
-  })
+  const [gridModeEnabled, setGridModeEnabled] = useState<boolean>(() =>
+    Boolean(initialData?.appState?.gridModeEnabled)
+  )
 
   const apiRef = useRef<any>(null)
   const [mountBeforeDraw, setMountBeforeDraw] = useState<HTMLElement | null>(null)
@@ -72,8 +63,7 @@ export function BoardPage() {
       elements: [],
       files: {},
       appState: {
-        viewBackgroundColor: "#1f1f1f",
-        // Keep the full toolbar visible (easier UX + matches your request for tool buttons)
+        viewBackgroundColor: "#ffffff",
         zenModeEnabled: false,
         gridModeEnabled: false,
       },
@@ -83,7 +73,7 @@ export function BoardPage() {
   const toSerializableAppState = useCallback(
     (appState: any) => {
       return {
-        viewBackgroundColor: appState?.viewBackgroundColor ?? "#1f1f1f",
+        viewBackgroundColor: appState?.viewBackgroundColor ?? "#ffffff",
         zenModeEnabled: Boolean(appState?.zenModeEnabled),
         gridModeEnabled: Boolean(gridModeEnabled),
         ...(typeof appState?.theme === "string" ? { theme: appState.theme } : {}),
@@ -108,7 +98,7 @@ export function BoardPage() {
     elements: [],
     files: {},
     appState: {
-      viewBackgroundColor: "#1f1f1f",
+      viewBackgroundColor: "#ffffff",
       zenModeEnabled: false,
       gridModeEnabled: false,
     },
@@ -162,7 +152,6 @@ export function BoardPage() {
       setMountAfterEraser(null)
       setMountBeforeDraw(null)
     }
-    // Intentionally only re-run when board changes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [boardId])
 
@@ -171,9 +160,9 @@ export function BoardPage() {
     minWidth: 32,
     padding: "0 10px",
     borderRadius: 10,
-    border: "1px solid rgba(255, 255, 255, 0.14)",
-    background: "rgba(255, 255, 255, 0.06)",
-    color: "inherit",
+    border: "1px solid rgba(0, 0, 0, 0.12)",
+    background: "rgba(255, 255, 255, 0.85)",
+    color: "#111",
     cursor: "pointer",
     fontWeight: 800,
     display: "inline-flex",
@@ -194,7 +183,6 @@ export function BoardPage() {
 
   const sendRedo = () => {
     const isMac = /Mac|iPhone|iPad|iPod/.test(navigator.platform)
-    // Prefer Cmd/Ctrl+Shift+Z
     window.dispatchEvent(
       new KeyboardEvent("keydown", {
         key: "z",
@@ -202,7 +190,6 @@ export function BoardPage() {
         ...(isMac ? { metaKey: true } : { ctrlKey: true }),
       })
     )
-    // Also support Ctrl+Y on non-mac
     if (!isMac) {
       window.dispatchEvent(new KeyboardEvent("keydown", { key: "y", ctrlKey: true }))
     }
@@ -214,11 +201,9 @@ export function BoardPage() {
         excalidrawAPI={(api) => {
           apiRef.current = api
         }}
-        // Cast because we intentionally sanitize persisted data and keep a minimal appState subset.
         initialData={initialDataForExcalidraw as any}
         gridModeEnabled={gridModeEnabled}
         onChange={(elements, appState, files) => {
-          // Save locally so refresh preserves the board
           persist({
             elements,
             appState: toSerializableAppState(appState),
