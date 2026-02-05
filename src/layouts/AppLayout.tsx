@@ -17,17 +17,26 @@ export function AppLayout() {
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-3">
           <div className="flex items-center gap-3">
             <button
-              className="rounded-lg px-2 py-1 text-lg font-bold tracking-tight text-text-primary hover:bg-toolbar transition-colors duration-fast"
+              className="inline-flex items-center gap-2.5 rounded-lg px-2 py-1 text-xl font-bold tracking-tight text-text-primary hover:bg-toolbar transition-colors duration-fast"
               type="button"
               onClick={() => navigate("/app/dashboard")}
             >
+              <img
+                src="/logo.png"
+                alt=""
+                aria-hidden="true"
+                className="h-7 w-7"
+                width={28}
+                height={28}
+              />
               CoLab
             </button>
             <button
               className="hidden rounded-lg border border-border bg-surface px-3 py-2 text-sm font-semibold text-text-secondary shadow-xs hover:bg-toolbar transition-colors duration-fast md:inline-flex"
               type="button"
+              onClick={() => navigate("/app/dashboard")}
             >
-              Workspaces
+              Dashboard
             </button>
           </div>
 

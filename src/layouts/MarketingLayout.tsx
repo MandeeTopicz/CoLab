@@ -1,44 +1,53 @@
-import { NavLink, Outlet } from "react-router-dom"
+import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom"
+import { useEffect } from "react"
 
 export function MarketingLayout() {
+  const location = useLocation()
+  const navigate = useNavigate()
+  const isLanding = location.pathname === "/"
+
+  useEffect(() => {
+    if (location.pathname !== "/") return
+    if (location.hash !== "#about") return
+    const t = window.setTimeout(() => {
+      document.getElementById("about")?.scrollIntoView({ behavior: "smooth", block: "start" })
+    }, 0)
+    return () => window.clearTimeout(t)
+  }, [location.pathname, location.hash])
+
   return (
     <div className="min-h-screen flex flex-col">
       <header className="sticky top-0 z-10 border-b border-border/80 bg-surface/90 backdrop-blur">
-        <div className="mx-auto flex max-w-6xl items-center gap-4 px-4 py-3">
+        <div className="flex w-full items-center justify-between gap-4 px-6 py-3 sm:px-8">
           <NavLink
             to="/"
-            className="rounded-lg px-2 py-1 text-lg font-bold tracking-tight text-text-primary hover:bg-toolbar transition-colors duration-fast"
+            className="inline-flex items-center gap-2.5 rounded-lg px-2 py-1 text-xl font-bold tracking-tight text-text-primary hover:bg-toolbar transition-colors duration-fast"
           >
+            <img
+              src="/logo.png"
+              alt=""
+              aria-hidden="true"
+              className="h-7 w-7"
+              width={28}
+              height={28}
+            />
             CoLab
           </NavLink>
 
-          <nav className="hidden flex-1 items-center justify-center gap-1 md:flex">
-            {[
-              ["/product", "Product"],
-              ["/use-cases", "Use cases"],
-              ["/templates", "Templates"],
-              ["/pricing", "Pricing"],
-              ["/enterprise", "Enterprise"],
-              ["/resources", "Resources"],
-              ["/blog", "Blog"],
-              ["/help", "Help"],
-            ].map(([to, label]) => (
-              <NavLink
-                key={to}
-                to={to}
-                className={({ isActive }) =>
-                  [
-                    "rounded-lg px-3 py-2 text-sm font-medium transition-colors duration-fast",
-                    isActive ? "bg-toolbar text-text-primary" : "text-text-secondary hover:bg-toolbar",
-                  ].join(" ")
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              className="rounded-lg px-3 py-2 text-sm font-semibold text-text-secondary hover:bg-toolbar hover:text-text-primary transition-colors duration-fast"
+              onClick={() => {
+                if (location.pathname === "/" && location.hash === "#about") {
+                  document.getElementById("about")?.scrollIntoView({ behavior: "smooth", block: "start" })
+                  return
                 }
-              >
-                {label}
-              </NavLink>
-            ))}
-          </nav>
-
-          <div className="ml-auto flex items-center gap-2">
+                navigate("/#about")
+              }}
+            >
+              About
+            </button>
             <NavLink
               to="/login"
               className="rounded-lg px-3 py-2 text-sm font-semibold text-text-secondary hover:bg-toolbar transition-colors duration-fast"
@@ -56,13 +65,17 @@ export function MarketingLayout() {
       </header>
 
       <main className="flex-1">
-        <div className="mx-auto w-full max-w-6xl px-4 py-10">
+        {isLanding ? (
           <Outlet />
-        </div>
+        ) : (
+          <div className="mx-auto w-full max-w-6xl px-4 py-10">
+            <Outlet />
+          </div>
+        )}
       </main>
 
       <footer className="border-t border-border/80 bg-surface">
-        <div className="mx-auto max-w-6xl px-4 py-8">
+        <div className="w-full px-6 py-8 sm:px-8">
           <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
             <div>
               <div className="text-sm font-semibold text-text-primary">Product</div>

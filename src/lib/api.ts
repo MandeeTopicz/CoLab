@@ -32,6 +32,17 @@ export function useApi() {
       request<{ boardId: string }>("/api/boards", { method: "POST", headers, body: JSON.stringify(body) }),
     listBoards: (workspaceId: string) =>
       request<{ boards: any[] }>(`/api/workspaces/${workspaceId}/boards`, { method: "GET", headers }),
+    generateTemplate: (body: { prompt: string }) =>
+      request<{ spec: any }>("/api/ai/template", { method: "POST", headers, body: JSON.stringify(body) }),
+    getBoard: (boardId: string) => request<{ board: any }>(`/api/boards/${boardId}`, { method: "GET", headers }),
+    saveBoardScene: (boardId: string, body: { scene: any }) =>
+      request<{ ok: true; updatedAt: number }>(`/api/boards/${boardId}/scene`, {
+        method: "PUT",
+        headers,
+        body: JSON.stringify(body),
+      }),
+    shareBoard: (boardId: string, body: { email: string }) =>
+      request<{ ok: true }>(`/api/boards/${boardId}/share`, { method: "POST", headers, body: JSON.stringify(body) }),
   }
 }
 

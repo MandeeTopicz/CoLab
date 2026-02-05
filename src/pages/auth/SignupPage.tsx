@@ -18,7 +18,7 @@ export function SignupPage() {
         <h1 className="text-xl font-semibold text-text-primary">Sign up</h1>
         <p className="mt-2 text-sm text-text-secondary">
           Already have an account?{" "}
-          <Link className="font-semibold text-primary hover:text-primary-hover" to="/login">
+          <Link className="font-semibold text-link hover:text-link-hover active:text-link-active" to="/login">
             Log in
           </Link>
         </p>

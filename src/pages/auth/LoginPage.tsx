@@ -20,7 +20,7 @@ export function LoginPage() {
         <h1 className="text-xl font-semibold text-text-primary">Log in</h1>
         <p className="mt-2 text-sm text-text-secondary">
           New here?{" "}
-          <Link className="font-semibold text-primary hover:text-primary-hover" to="/signup">
+          <Link className="font-semibold text-link hover:text-link-hover active:text-link-active" to="/signup">
             Create an account
           </Link>
         </p>

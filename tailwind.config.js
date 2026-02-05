@@ -21,10 +21,17 @@ export default {
 
         /* Primary Brand / Action */
         primary: {
+          DEFAULT: "#C5BAAF",
+          hover: "#B4A79B",
+          active: "#A29182",
+          subtle: "#F3EFEB",
+        },
+
+        /* Link color (keep classic blue for text links) */
+        link: {
           DEFAULT: "#2563EB",
           hover: "#1D4ED8",
           active: "#1E40AF",
-          subtle: "#EFF6FF",
         },
 
         /* Accent / Creative Colors */
