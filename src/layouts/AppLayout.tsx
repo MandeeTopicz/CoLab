@@ -1,12 +1,34 @@
+import { useEffect, useState } from "react"
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom"
 import { useAuth } from "../auth/AuthProvider"
+import { useApi } from "../lib/api"
 
 export function AppLayout() {
   const { user, logout } = useAuth()
+  const api = useApi()
   const navigate = useNavigate()
   const location = useLocation()
 
   const isBoardRoute = location.pathname.startsWith("/app/boards/")
+  const [unreadCount, setUnreadCount] = useState(0)
+
+  useEffect(() => {
+    let alive = true
+    ;(async () => {
+      try {
+        const res = await api.listNotifications({ limit: 50 })
+        if (!alive) return
+        const unread = (res.notifications || []).filter((n: any) => !n?.readAt).length
+        setUnreadCount(unread)
+      } catch {
+        if (!alive) return
+        setUnreadCount(0)
+      }
+    })()
+    return () => {
+      alive = false
+    }
+  }, [location.pathname, user?.userId])
 
   return (
     <div className="min-h-screen">
@@ -65,7 +87,14 @@ export function AppLayout() {
                 ].join(" ")
               }
             >
-              Notifications
+              <span className="inline-flex items-center gap-2">
+                Notifications
+                {unreadCount > 0 && (
+                  <span className="inline-flex min-w-5 items-center justify-center rounded-full bg-primary px-1.5 py-0.5 text-[11px] font-bold text-text-inverse">
+                    {unreadCount > 99 ? "99+" : unreadCount}
+                  </span>
+                )}
+              </span>
             </NavLink>
             <NavLink
               to="/app/account"

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { useParams } from "react-router-dom"
+import { useNavigate, useParams } from "react-router-dom"
 import { Excalidraw } from "@excalidraw/excalidraw"
 import "@excalidraw/excalidraw/index.css"
 import { getWsUrl, useApi } from "../../lib/api"
@@ -7,6 +7,39 @@ import { useAuth } from "../../auth/AuthProvider"
 
 function isRecord(v: unknown): v is Record<string, unknown> {
   return typeof v === "object" && v !== null
+}
+
+/** Bounding box of elements in scene coordinates for viewport fit. */
+function getElementsBoundingBox(elements: any[]): { minX: number; minY: number; maxX: number; maxY: number } | null {
+  if (!elements?.length) return null
+  let minX = Infinity,
+    minY = Infinity,
+    maxX = -Infinity,
+    maxY = -Infinity
+  for (const el of elements) {
+    if (!el) continue
+    if (Array.isArray(el.points) && el.points.length > 0) {
+      for (const p of el.points) {
+        const x = el.x + (p?.[0] ?? 0),
+          y = el.y + (p?.[1] ?? 0)
+        minX = Math.min(minX, x)
+        maxX = Math.max(maxX, x)
+        minY = Math.min(minY, y)
+        maxY = Math.max(maxY, y)
+      }
+    } else {
+      const x = Number(el.x) || 0,
+        y = Number(el.y) || 0,
+        w = Number(el.width) || 0,
+        h = Number(el.height) || 0
+      minX = Math.min(minX, x)
+      maxX = Math.max(maxX, x + w)
+      minY = Math.min(minY, y)
+      maxY = Math.max(maxY, y + h)
+    }
+  }
+  if (minX === Infinity) return null
+  return { minX, minY, maxX, maxY }
 }
 
 function toColorInputValue(value: unknown, fallback: string) {
@@ -80,6 +113,56 @@ function ShareIcon() {
         strokeWidth="2"
         strokeLinecap="round"
         strokeLinejoin="round"
+      />
+    </svg>
+  )
+}
+
+function SaveIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className={ICON_CLASS} aria-hidden>
+      <path
+        d="M5 4h11l3 3v13H5V4z"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M8 4v6h8V4"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M8 20v-7h8v7"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinejoin="round"
+      />
+    </svg>
+  )
+}
+
+function CopyIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className={ICON_CLASS} aria-hidden>
+      <path
+        d="M8 8h11v13H8V8z"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M5 16H4a1 1 0 01-1-1V4a1 1 0 011-1h11a1 1 0 011 1v1"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinejoin="round"
+        strokeLinecap="round"
       />
     </svg>
   )
@@ -350,6 +433,7 @@ function makeTextElement(opts: {
   textAlign?: "left" | "center" | "right"
   verticalAlign?: "top" | "middle" | "bottom"
   opacity?: number
+  autoResize?: boolean
 }) {
   const base: any = makeBaseElement("text", {
     x: opts.x,
@@ -372,17 +456,133 @@ function makeTextElement(opts: {
     baseline: Math.max(1, Math.round(fontSize * 0.9)),
     lineHeight: 1.25,
     containerId: null,
-    autoResize: true,
+    autoResize: opts.autoResize !== false,
   }
 }
 
-function inferTemplateKind(prompt: string) {
-  const p = prompt.toLowerCase()
-  if (/(retro|retrospective|post[- ]mortem|postmortem)/.test(p)) return "retro"
-  if (/(kanban|to do|todo|doing|done|backlog)/.test(p)) return "kanban"
-  if (/(brainstorm|ideation|ideas|mind map|mindmap)/.test(p)) return "brainstorm"
-  if (/(sprint planning|planning|standup|meeting|workshop|kickoff|project)/.test(p)) return "kickoff"
+/** Stable hash of string to number for layout variant selection (no randomness). */
+function hashString(s: string): number {
+  let h = 0
+  for (let i = 0; i < s.length; i++) h = (Math.imul(31, h) + s.charCodeAt(i)) | 0
+  return Math.abs(h)
+}
+
+function inferTemplateKind(prompt: string): "retro" | "kanban" | "brainstorm" | "diagram" | "kickoff" {
+  const p = prompt.toLowerCase().trim()
+  if (/(retro|retrospective|post[- ]mortem|postmortem|went well|to improve)/.test(p)) return "retro"
+  if (/(kanban|to do|todo|doing|done|backlog|board|columns?|pipeline)/.test(p)) return "kanban"
+  if (/(brainstorm|ideation|ideas|mind map|mindmap|sticky|notes?)/.test(p)) return "brainstorm"
+  if (/(diagram|architecture|sequence|flow|system design|technical spec|uml)/.test(p)) return "diagram"
+  if (/(sprint|planning|standup|meeting|workshop|kickoff|project|agenda|goals?|scope)/.test(p)) return "kickoff"
   return "kickoff"
+}
+
+const GENERIC_TITLES = new Set([
+  "brainstorm",
+  "ideas",
+  "kanban",
+  "retro",
+  "retrospective",
+  "project kickoff",
+  "kickoff",
+  "workshop",
+  "board",
+])
+
+const MAX_TITLE_WORDS = 7
+const MAX_TITLE_CHARS = 48
+
+/** Return true if s is a valid outcome-focused title (not generic, 3–7 words). */
+function isValidSpecTitle(s: string): boolean {
+  const t = s.trim()
+  if (t.length < 3) return false
+  const lower = t.toLowerCase()
+  if (GENERIC_TITLES.has(lower)) return false
+  const words = t.split(/\s+/).filter(Boolean)
+  return words.length >= 3 && words.length <= MAX_TITLE_WORDS
+}
+
+/** Cap title to 3–7 words and max chars; never return raw prompt. */
+function capTitleWordsAndChars(raw: string): string {
+  const words = raw.trim().split(/\s+/).filter(Boolean).slice(0, MAX_TITLE_WORDS)
+  let out = words.join(" ")
+  if (out.length > MAX_TITLE_CHARS) out = out.slice(0, MAX_TITLE_CHARS - 1).trim().replace(/\s+\S*$/, "") || out.slice(0, MAX_TITLE_CHARS)
+  return out || "New board"
+}
+
+/** First letter of each word uppercase for scannable titles. */
+function titleCase(s: string): string {
+  return s
+    .trim()
+    .split(/\s+/)
+    .map((w) => (w.length > 0 ? w[0].toUpperCase() + w.slice(1).toLowerCase() : w))
+    .join(" ")
+}
+
+/**
+ * Derive a short (3–7 word) outcome-focused board title from spec or prompt.
+ * Never use the raw user prompt as the title. Describe purpose/outcome, not instructions.
+ */
+function deriveShortTitle(prompt: string, spec: any): string {
+  const fromSpec = typeof spec?.title === "string" && spec.title.trim()
+  if (fromSpec && isValidSpecTitle(spec.title)) return capTitleWordsAndChars(spec.title.trim())
+
+  const p = prompt.trim()
+  const lower = p.toLowerCase()
+  if (!p) return "New board"
+
+  // Pattern: "... for [a] [topic]" or "... for [topic]" → use topic + outcome type
+  const forMatch = lower.match(/\bfor\s+(?:a\s+|the\s+)?([^.,]+?)(?:\s+with\s+|\s*$)/)
+  const topic = forMatch ? forMatch[1].trim().replace(/\s+/g, " ").split(/\s+/).slice(0, 4) : []
+
+  // Outcome-type phrases (order matters: longer first); apply titleCase for human-readable titles
+  if (/\bsprint\s+planning\b/.test(lower)) return titleCase(capTitleWordsAndChars([...topic.slice(0, 2), "Sprint", "Plan"].filter(Boolean).join(" ") || "Sprint planning"))
+  if (/\b(retro|retrospective|post[- ]?mortem)\b/.test(lower)) return titleCase(capTitleWordsAndChars([...topic.slice(0, 2), "Retro"].filter(Boolean).join(" ") || "Retrospective"))
+  if (/\bbrainstorm\b/.test(lower)) return titleCase(capTitleWordsAndChars([...topic.slice(0, 2), "Brainstorm"].filter(Boolean).join(" ") || "Brainstorm"))
+  if (/\b(product\s+)?launch\b/.test(lower)) return titleCase(capTitleWordsAndChars([...topic.slice(0, 2), "Launch"].filter(Boolean).join(" ") || "Launch planning"))
+  if (/\bmarketing\s+ideas\b/.test(lower)) return titleCase(capTitleWordsAndChars([...topic.slice(0, 2), "Marketing", "Brainstorm"].filter(Boolean).join(" ") || "Marketing brainstorm"))
+  if (/\bkanban\b/.test(lower)) return titleCase(capTitleWordsAndChars([...topic.slice(0, 2), "Board"].filter(Boolean).join(" ") || "Kanban board"))
+  if (/\bkickoff\b/.test(lower)) return titleCase(capTitleWordsAndChars([...topic.slice(0, 2), "Kickoff"].filter(Boolean).join(" ") || "Project kickoff"))
+  if (/\b(architecture|sequence|flow)\s+diagram\b/.test(lower)) return titleCase(capTitleWordsAndChars([...topic.slice(0, 2), "Diagram"].filter(Boolean).join(" ") || "Diagram"))
+
+  // Fallback: use topic if we have "for X"; otherwise first 3–7 meaningful words (not instructional)
+  const stop = new Set(["create", "make", "build", "add", "give", "need", "want", "a", "an", "the", "for", "with", "and", "or", "to", "in", "on", "of", "we", "i", "my", "our", "board"])
+  const words = p.split(/\s+/).filter((w) => w.length > 1 && !stop.has(w.toLowerCase()))
+  if (topic.length > 0) return titleCase(capTitleWordsAndChars(topic.slice(0, 3).join(" ")))
+  if (words.length > 0) return titleCase(capTitleWordsAndChars(words.slice(0, MAX_TITLE_WORDS).join(" ")))
+  return titleCase(capTitleWordsAndChars(p.split(/\s+/).slice(0, 5).join(" ")))
+}
+
+/** Max content width so template fits viewport with padding (fit uses 80px padding). */
+const TEMPLATE_CONTENT_WIDTH = 1100
+/** Title width constrained so title is always visible at default zoom; no horizontal overflow. */
+const TEMPLATE_TITLE_WIDTH = 640
+const TITLE_FONT_SIZE_DEFAULT = 28
+const TITLE_FONT_SIZE_SMALL = 20
+/** Max chars to display in title box at default font so it never overflows or clips. */
+const MAX_TITLE_DISPLAY_CHARS = 34
+
+/** Prepare title for rendering: truncate with ellipsis if needed, choose font size so it fits. */
+function prepareTitleForDisplay(title: string): { text: string; fontSize: number } {
+  const t = title.trim()
+  if (t.length <= MAX_TITLE_DISPLAY_CHARS) return { text: t, fontSize: TITLE_FONT_SIZE_DEFAULT }
+  const truncated = t.slice(0, MAX_TITLE_DISPLAY_CHARS - 1).trim().replace(/\s+\S*$/, "") || t.slice(0, MAX_TITLE_DISPLAY_CHARS - 1)
+  const text = (truncated + "…").slice(0, MAX_TITLE_DISPLAY_CHARS + 1)
+  const fontSize = t.length > 28 ? TITLE_FONT_SIZE_SMALL : TITLE_FONT_SIZE_DEFAULT
+  return { text, fontSize }
+}
+
+const LAYOUT_VARIANT_COUNT = 4
+
+/** Parse previous layout tag "kind:variant" to avoid reusing same layout on consecutive generations. */
+function parsePreviousLayoutType(previous: string | undefined): { kind: string; variant: number } | null {
+  if (!previous || typeof previous !== "string") return null
+  const i = previous.indexOf(":")
+  if (i <= 0 || i === previous.length - 1) return null
+  const k = previous.slice(0, i).trim()
+  const v = parseInt(previous.slice(i + 1), 10)
+  if (k === "" || !Number.isInteger(v) || v < 0) return null
+  return { kind: k, variant: v }
 }
 
 function generateTemplateElements(args: {
@@ -390,58 +590,62 @@ function generateTemplateElements(args: {
   centerX: number
   centerY: number
   spec?: any
-}) {
-  const kind = String(args.spec?.kind || inferTemplateKind(args.prompt))
+  previousLayoutType?: string
+}): { elements: any[]; layoutType: string; generationStrategy: string } {
+  const kind = (args.spec?.kind || inferTemplateKind(args.prompt)) as "retro" | "kanban" | "brainstorm" | "diagram" | "kickoff"
   const elements: any[] = []
-
   const cx = args.centerX
   const cy = args.centerY
+  let layoutVariant = hashString(args.prompt.trim() || kind) % LAYOUT_VARIANT_COUNT
+  const prev = parsePreviousLayoutType(args.previousLayoutType)
+  if (prev && prev.kind === kind && prev.variant === layoutVariant) {
+    layoutVariant = (layoutVariant + 1) % LAYOUT_VARIANT_COUNT
+  }
+  const generationStrategy = args.previousLayoutType ? "avoid_consecutive" : "hash_prompt"
 
-  const title =
-    typeof args.spec?.title === "string" && args.spec.title.trim()
-      ? args.spec.title.trim()
-      : args.prompt.trim()
-        ? `AI Template: ${args.prompt.trim()}`
-        : kind === "retro"
-          ? "Retro"
-          : kind === "kanban"
-            ? "Kanban"
-            : kind === "brainstorm"
-              ? "Brainstorm"
-              : "Project Kickoff"
+  const boardTitle = deriveShortTitle(args.prompt, args.spec)
+  const { text: titleText, fontSize: titleFontSize } = prepareTitleForDisplay(boardTitle)
 
   elements.push(
     makeTextElement({
-      x: cx - 520,
-      y: cy - 420,
-      width: 1040,
+      x: cx - TEMPLATE_TITLE_WIDTH / 2,
+      y: cy - 340,
+      width: TEMPLATE_TITLE_WIDTH,
       height: 44,
-      text: title,
+      text: titleText,
       fontFamily: 2,
-      fontSize: 32,
+      fontSize: titleFontSize,
       textAlign: "center",
       strokeColor: "#0f172a",
+      autoResize: false,
     })
   )
 
   if (kind === "kanban") {
-    const boardX = cx - 600
-    const boardY = cy - 340
-    const colW = 380
-    const colH = 560
-    const gap = 30
+    const numColsVariant = [2, 3, 4, 3][layoutVariant % 4]
+    const colCount = Array.isArray(args.spec?.columns) && args.spec?.kind === "kanban"
+      ? Math.max(2, Math.min(5, (args.spec.columns as any[]).length))
+      : numColsVariant
+    const totalW = TEMPLATE_CONTENT_WIDTH - 80
+    const gap = 20
+    const colW = (totalW - gap * (colCount - 1)) / colCount
+    const colH = 420
+    const boardX = cx - totalW / 2
+    const boardY = cy - 260
+
     const cols: Array<{ title: string; cards: string[]; color?: string }> =
       Array.isArray(args.spec?.columns) && args.spec?.kind === "kanban"
-        ? (args.spec.columns as any[]).map((c: any) => ({
+        ? (args.spec.columns as any[]).slice(0, colCount).map((c: any) => ({
             title: String(c?.title || "Column"),
             cards: Array.isArray(c?.cards) ? c.cards.map((s: any) => String(s)).filter(Boolean) : [],
             color: isHexColor(c?.color) ? c.color : undefined,
           }))
         : [
-            { title: "To do", cards: ["Add a task…", "Add another task…"] },
-            { title: "Doing", cards: ["In progress…", "Blocked? Add note…"] },
-            { title: "Done", cards: ["Shipped…", "Validated…"] },
-          ]
+            { title: "To do", cards: ["New task", "Review & prioritize", "Break down if needed"] },
+            { title: "Doing", cards: ["In progress", "Blocked? Add note", "Update status"] },
+            ...(colCount >= 3 ? [{ title: "Done", cards: ["Completed", "Validated", "Archived"] }] : []),
+            ...(colCount >= 4 ? [{ title: "Backlog", cards: ["Future item", "Idea", "Maybe later"] }] : []),
+          ].slice(0, colCount)
 
     cols.forEach((label, i) => {
       const x = boardX + i * (colW + gap)
@@ -460,183 +664,27 @@ function generateTemplateElements(args: {
       )
       elements.push(
         makeTextElement({
-          x: x + 18,
-          y: y + 16,
-          width: colW - 36,
-          height: 28,
+          x: x + 14,
+          y: y + 14,
+          width: colW - 28,
+          height: 26,
           text: label.title,
           fontFamily: 2,
-          fontSize: 20,
+          fontSize: 18,
           strokeColor: "#0f172a",
         })
       )
-
-      // A couple of starter "sticky" cards
       const stickyBg = label.color || "#FEF08A"
       const stickyStroke = label.color || "#EAB308"
-      const cards = label.cards.length ? label.cards.slice(0, 6) : ["Add a task…", "Add another task…"]
+      const cards = label.cards.length ? label.cards.slice(0, 5) : ["Task 1", "Task 2", "Task 3"]
+      const cardH = 68
       cards.forEach((text, n) => {
-        const sy = y + 64 + n * 96
+        const sy = y + 52 + n * (cardH + 10)
         elements.push(
           makeBaseElement("rectangle", {
-            x: x + 18,
+            x: x + 14,
             y: sy,
-            width: colW - 36,
-            height: 76,
-            strokeColor: stickyStroke,
-            backgroundColor: stickyBg,
-            roundness: { type: 3 },
-            roughness: 0,
-          })
-        )
-        elements.push(
-          makeTextElement({
-            x: x + 32,
-            y: sy + 16,
-            width: colW - 64,
-            height: 44,
-            text,
-            fontFamily: 2,
-            fontSize: 16,
-            strokeColor: "#0f172a",
-          })
-        )
-      })
-    })
-  } else if (kind === "retro") {
-    const boardX = cx - 600
-    const boardY = cy - 340
-    const colW = 380
-    const colH = 560
-    const gap = 30
-    const cols: Array<{ title: string; cards: string[]; color?: string }> =
-      Array.isArray(args.spec?.columns) && args.spec?.kind === "retro"
-        ? (args.spec.columns as any[]).map((c: any) => ({
-            title: String(c?.title || "Column"),
-            cards: Array.isArray(c?.cards) ? c.cards.map((s: any) => String(s)).filter(Boolean) : [],
-            color: isHexColor(c?.color) ? c.color : undefined,
-          }))
-        : [
-            { title: "Went well", cards: ["Add a note…", "Add a note…", "Add a note…"] },
-            { title: "To improve", cards: ["Add a note…", "Add a note…", "Add a note…"] },
-            { title: "Action items", cards: ["Add a note…", "Add a note…", "Add a note…"] },
-          ]
-
-    cols.forEach((label, i) => {
-      const x = boardX + i * (colW + gap)
-      const y = boardY
-      elements.push(
-        makeBaseElement("rectangle", {
-          x,
-          y,
-          width: colW,
-          height: colH,
-          strokeColor: "#cbd5e1",
-          backgroundColor: "#ffffff",
-          roundness: { type: 3 },
-          roughness: 0,
-        })
-      )
-      elements.push(
-        makeTextElement({
-          x: x + 18,
-          y: y + 16,
-          width: colW - 36,
-          height: 28,
-          text: label.title,
-          fontFamily: 2,
-          fontSize: 20,
-          strokeColor: "#0f172a",
-        })
-      )
-
-      // Starter sticky notes
-      const fallbackBg = i === 0 ? "#BBF7D0" : i === 1 ? "#FED7AA" : "#DBEAFE"
-      const fallbackStroke = i === 0 ? "#22C55E" : i === 1 ? "#F97316" : "#3B82F6"
-      const stickyBg = label.color || fallbackBg
-      const stickyStroke = label.color || fallbackStroke
-      const cards = label.cards.length ? label.cards.slice(0, 10) : ["Add a note…", "Add a note…", "Add a note…"]
-      cards.forEach((text, n) => {
-        const sy = y + 64 + n * 86
-        elements.push(
-          makeBaseElement("rectangle", {
-            x: x + 18,
-            y: sy,
-            width: colW - 36,
-            height: 66,
-            strokeColor: stickyStroke,
-            backgroundColor: stickyBg,
-            roundness: { type: 3 },
-            roughness: 0,
-          })
-        )
-        elements.push(
-          makeTextElement({
-            x: x + 32,
-            y: sy + 14,
-            width: colW - 64,
-            height: 40,
-            text,
-            fontFamily: 2,
-            fontSize: 16,
-            strokeColor: "#0f172a",
-          })
-        )
-      })
-    })
-  } else if (kind === "brainstorm") {
-    const areaX = cx - 620
-    const areaY = cy - 340
-    elements.push(
-      makeBaseElement("rectangle", {
-        x: areaX,
-        y: areaY,
-        width: 1240,
-        height: 560,
-        strokeColor: "#cbd5e1",
-        backgroundColor: "#ffffff",
-        roundness: { type: 3 },
-        roughness: 0,
-      })
-    )
-    elements.push(
-      makeTextElement({
-        x: areaX + 18,
-        y: areaY + 16,
-        width: 1240 - 36,
-        height: 28,
-        text: "Brainstorm space",
-        fontFamily: 2,
-        fontSize: 20,
-        strokeColor: "#0f172a",
-      })
-    )
-
-    const stickyBg = "#FEF08A"
-    const stickyStroke = "#EAB308"
-    const startX = areaX + 40
-    const startY = areaY + 74
-    const cardW = 240
-    const cardH = 120
-    const gx = 24
-    const gy = 24
-    const prompts: string[] =
-      Array.isArray(args.spec?.prompts) && args.spec?.kind === "brainstorm"
-        ? (args.spec.prompts as any[]).map((s: any) => String(s)).filter(Boolean)
-        : ["Idea…", "Idea…", "Idea…", "Idea…", "Idea…", "Idea…", "Idea…", "Idea…"]
-
-    let idx = 0
-    for (let r = 0; r < 2; r++) {
-      for (let c = 0; c < 4; c++) {
-        const x = startX + c * (cardW + gx)
-        const y = startY + r * (cardH + gy)
-        const text = prompts[idx] || "Idea…"
-        idx++
-        elements.push(
-          makeBaseElement("rectangle", {
-            x,
-            y,
-            width: cardW,
+            width: colW - 28,
             height: cardH,
             strokeColor: stickyStroke,
             backgroundColor: stickyBg,
@@ -646,45 +694,282 @@ function generateTemplateElements(args: {
         )
         elements.push(
           makeTextElement({
-            x: x + 14,
-            y: y + 14,
-            width: cardW - 28,
-            height: cardH - 28,
+            x: x + 22,
+            y: sy + 12,
+            width: colW - 44,
+            height: 44,
             text,
             fontFamily: 2,
-            fontSize: 18,
+            fontSize: 14,
             strokeColor: "#0f172a",
           })
         )
-      }
+      })
+    })
+  } else if (kind === "retro") {
+    const numColsVariant = [2, 3, 4, 3][layoutVariant % 4]
+    const colCount = Array.isArray(args.spec?.columns) && args.spec?.kind === "retro"
+      ? Math.max(2, Math.min(4, (args.spec.columns as any[]).length))
+      : numColsVariant
+    const totalW = TEMPLATE_CONTENT_WIDTH - 80
+    const gap = 20
+    const colW = (totalW - gap * (colCount - 1)) / colCount
+    const colH = 380
+    const boardX = cx - totalW / 2
+    const boardY = cy - 260
+
+    const cols: Array<{ title: string; cards: string[]; color?: string }> =
+      Array.isArray(args.spec?.columns) && args.spec?.kind === "retro"
+        ? (args.spec.columns as any[]).slice(0, colCount).map((c: any) => ({
+            title: String(c?.title || "Column"),
+            cards: Array.isArray(c?.cards) ? c.cards.map((s: any) => String(s)).filter(Boolean) : [],
+            color: isHexColor(c?.color) ? c.color : undefined,
+          }))
+        : colCount === 2
+          ? [
+              { title: "Went well", cards: ["Smooth delivery", "Good collaboration", "Clear scope"] },
+              { title: "To improve", cards: ["Timeline slip", "Communication", "Next time we…"] },
+            ]
+          : [
+              { title: "Went well", cards: ["Win 1", "Win 2", "Win 3"] },
+              { title: "To improve", cards: ["Improvement 1", "Improvement 2"] },
+              { title: "Action items", cards: ["Owner + due date", "Follow-up"] },
+              ...(colCount >= 4 ? [{ title: "Kudos", cards: ["Shout-out", "Thank you"] }] : []),
+            ].slice(0, colCount)
+
+    cols.forEach((label, i) => {
+      const x = boardX + i * (colW + gap)
+      const y = boardY
+      elements.push(
+        makeBaseElement("rectangle", {
+          x,
+          y,
+          width: colW,
+          height: colH,
+          strokeColor: "#cbd5e1",
+          backgroundColor: "#ffffff",
+          roundness: { type: 3 },
+          roughness: 0,
+        })
+      )
+      elements.push(
+        makeTextElement({
+          x: x + 14,
+          y: y + 14,
+          width: colW - 28,
+          height: 26,
+          text: label.title,
+          fontFamily: 2,
+          fontSize: 18,
+          strokeColor: "#0f172a",
+        })
+      )
+      const fallbackBg = i === 0 ? "#BBF7D0" : i === 1 ? "#FED7AA" : i === 2 ? "#DBEAFE" : "#E9D5FF"
+      const fallbackStroke = i === 0 ? "#22C55E" : i === 1 ? "#F97316" : i === 2 ? "#3B82F6" : "#A855F7"
+      const stickyBg = label.color || fallbackBg
+      const stickyStroke = label.color || fallbackStroke
+      const cards = label.cards.length ? label.cards.slice(0, 8) : ["Note 1", "Note 2", "Note 3"]
+      const cardH = 58
+      cards.forEach((text, n) => {
+        const sy = y + 50 + n * (cardH + 8)
+        elements.push(
+          makeBaseElement("rectangle", {
+            x: x + 14,
+            y: sy,
+            width: colW - 28,
+            height: cardH,
+            strokeColor: stickyStroke,
+            backgroundColor: stickyBg,
+            roundness: { type: 3 },
+            roughness: 0,
+          })
+        )
+        elements.push(
+          makeTextElement({
+            x: x + 22,
+            y: sy + 10,
+            width: colW - 44,
+            height: 38,
+            text,
+            fontFamily: 2,
+            fontSize: 14,
+            strokeColor: "#0f172a",
+          })
+        )
+      })
+    })
+  } else if (kind === "brainstorm") {
+    const areaW = TEMPLATE_CONTENT_WIDTH - 60
+    const areaH = 380
+    const areaX = cx - areaW / 2
+    const areaY = cy - 260
+    elements.push(
+      makeBaseElement("rectangle", {
+        x: areaX,
+        y: areaY,
+        width: areaW,
+        height: areaH,
+        strokeColor: "#cbd5e1",
+        backgroundColor: "#ffffff",
+        roundness: { type: 3 },
+        roughness: 0,
+      })
+    )
+
+    const prompts: string[] =
+      Array.isArray(args.spec?.prompts) && args.spec?.kind === "brainstorm"
+        ? (args.spec.prompts as any[]).map((s: any) => String(s)).filter(Boolean)
+        : (() => {
+            const words = args.prompt.trim().split(/\s+/).filter((w) => w.length > 2).slice(0, 6)
+            const base = words.length ? words : ["Topic"]
+            return base.map((_, i) => (i === 0 ? `Angle: ${base[0]}` : `Angle ${i + 1}`)).concat(
+              ["Another angle", "Alternative", "Option", "Variant", "Different view"].slice(0, 8 - base.length)
+            ).slice(0, 12)
+          })()
+
+    const gridLayouts: [number, number][] = [[3, 4], [4, 3], [2, 5], [3, 3]]
+    const [cols, rows] = gridLayouts[layoutVariant % gridLayouts.length]
+    const count = Math.min(cols * rows, prompts.length)
+    const cardW = 200
+    const cardH = 96
+    const gx = 16
+    const gy = 16
+    const innerW = cols * cardW + (cols - 1) * gx
+    const innerH = rows * cardH + (rows - 1) * gy
+    const startX = areaX + (areaW - innerW) / 2
+    const startY = areaY + 50
+
+    const colors: [string, string][] = [
+      ["#FEF08A", "#EAB308"],
+      ["#BBF7D0", "#22C55E"],
+      ["#DBEAFE", "#3B82F6"],
+      ["#FED7AA", "#F97316"],
+    ]
+    for (let i = 0; i < count; i++) {
+      const c = i % cols
+      const r = Math.floor(i / cols)
+      const [bg, stroke] = colors[i % colors.length]
+      const x = startX + c * (cardW + gx)
+      const y = startY + r * (cardH + gy)
+      const text = prompts[i] || `Point ${i + 1}`
+      elements.push(
+        makeBaseElement("rectangle", {
+          x,
+          y,
+          width: cardW,
+          height: cardH,
+          strokeColor: stroke,
+          backgroundColor: bg,
+          roundness: { type: 3 },
+          roughness: 0,
+        })
+      )
+      elements.push(
+        makeTextElement({
+          x: x + 12,
+          y: y + 12,
+          width: cardW - 24,
+          height: cardH - 24,
+          text,
+          fontFamily: 2,
+          fontSize: 15,
+          strokeColor: "#0f172a",
+        })
+      )
     }
+  } else if (kind === "diagram") {
+    const totalW = TEMPLATE_CONTENT_WIDTH - 80
+    const boardX = cx - totalW / 2
+    const boardY = cy - 260
+    const sectionW = totalW / 3 - 16
+    const sectionH = 140
+    const sections: Array<{ title: string; hint: string }> =
+      Array.isArray(args.spec?.sections) && (args.spec?.kind === "kickoff" || args.spec?.kind === "diagram")
+        ? (args.spec.sections as any[]).slice(0, 6).map((s: any) => ({
+            title: String(s?.title || "Component"),
+            hint: String(s?.hint ?? ""),
+          }))
+        : [
+            { title: "Input / Trigger", hint: "Entry point" },
+            { title: "Process", hint: "Main logic" },
+            { title: "Output", hint: "Result" },
+            { title: "Storage", hint: "Data layer" },
+            { title: "External API", hint: "Integration" },
+            { title: "Notes", hint: "Assumptions, constraints" },
+          ]
+    sections.forEach((sec, i) => {
+      const col = i % 3
+      const row = Math.floor(i / 3)
+      const x = boardX + col * (sectionW + 12)
+      const y = boardY + row * (sectionH + 12)
+      elements.push(
+        makeBaseElement("rectangle", {
+          x,
+          y,
+          width: sectionW,
+          height: sectionH,
+          strokeColor: "#94a3b8",
+          backgroundColor: "#f8fafc",
+          roundness: { type: 2 },
+          roughness: 0,
+        })
+      )
+      elements.push(
+        makeTextElement({
+          x: x + 12,
+          y: y + 12,
+          width: sectionW - 24,
+          height: 24,
+          text: sec.title,
+          fontFamily: 2,
+          fontSize: 16,
+          strokeColor: "#0f172a",
+        })
+      )
+      if (sec.hint) {
+        elements.push(
+          makeTextElement({
+            x: x + 12,
+            y: y + 42,
+            width: sectionW - 24,
+            height: sectionH - 54,
+            text: sec.hint,
+            fontFamily: 2,
+            fontSize: 13,
+            strokeColor: "#64748b",
+          })
+        )
+      }
+    })
   } else {
-    // Kickoff / workshop default
-    const x0 = cx - 620
-    const y0 = cy - 340
-    const cardW = 600
-    const cardH = 170
-    const gx = 40
-    const gy = 28
+    // Kickoff / workshop: layout variants (2-col, 3-col, single column)
+    const colCount = [2, 3, 2, 3][layoutVariant % 4]
+    const totalW = TEMPLATE_CONTENT_WIDTH - 80
+    const gap = 20
+    const cardW = (totalW - gap * (colCount - 1)) / colCount
+    const cardH = 120
+    const x0 = cx - totalW / 2
+    const y0 = cy - 260
+
     const cards: Array<{ title: string; hint: string }> =
       Array.isArray(args.spec?.sections) && args.spec?.kind === "kickoff"
         ? (args.spec.sections as any[])
             .map((s: any) => ({ title: String(s?.title || "Section"), hint: String(s?.hint || "") }))
-            .filter((s) => Boolean(s.title) && Boolean(s.hint))
-            .slice(0, 10)
+            .filter((s) => Boolean(s.title))
+            .slice(0, 8)
         : [
             { title: "Goal", hint: "What are we trying to achieve?" },
-            { title: "Audience / Users", hint: "Who is this for?" },
-            { title: "Scope", hint: "In / Out of scope" },
-            { title: "Constraints", hint: "Time, budget, tech, policy…" },
+            { title: "Audience", hint: "Who is this for?" },
+            { title: "Scope", hint: "In / out of scope" },
+            { title: "Constraints", hint: "Time, budget, tech" },
             { title: "Risks", hint: "What could block us?" },
             { title: "Next actions", hint: "Owners + due dates" },
           ]
     cards.forEach((c, i) => {
-      const col = i % 2
-      const row = Math.floor(i / 2)
-      const x = x0 + col * (cardW + gx)
-      const y = y0 + row * (cardH + gy)
+      const col = i % colCount
+      const row = Math.floor(i / colCount)
+      const x = x0 + col * (cardW + gap)
+      const y = y0 + row * (cardH + 16)
       elements.push(
         makeBaseElement("rectangle", {
           x,
@@ -699,32 +984,33 @@ function generateTemplateElements(args: {
       )
       elements.push(
         makeTextElement({
-          x: x + 20,
-          y: y + 18,
-          width: cardW - 40,
-          height: 28,
+          x: x + 14,
+          y: y + 14,
+          width: cardW - 28,
+          height: 24,
           text: c.title,
           fontFamily: 2,
-          fontSize: 20,
+          fontSize: 17,
           strokeColor: "#0f172a",
         })
       )
       elements.push(
         makeTextElement({
-          x: x + 20,
-          y: y + 54,
-          width: cardW - 40,
-          height: cardH - 72,
+          x: x + 14,
+          y: y + 44,
+          width: cardW - 28,
+          height: cardH - 58,
           text: c.hint,
           fontFamily: 2,
-          fontSize: 16,
+          fontSize: 14,
           strokeColor: "#64748b",
         })
       )
     })
   }
 
-  return elements
+  const layoutType = `${kind}:${layoutVariant}`
+  return { elements, layoutType, generationStrategy }
 }
 
 function sanitizeInitialData(raw: unknown) {
@@ -742,12 +1028,16 @@ function sanitizeInitialData(raw: unknown) {
   const gridModeEnabled = Boolean(appStateRaw.gridModeEnabled)
   const zenModeEnabled = Boolean(appStateRaw.zenModeEnabled)
   const theme = typeof appStateRaw.theme === "string" ? appStateRaw.theme : undefined
+  const __templateLayoutType = typeof appStateRaw.__templateLayoutType === "string" ? appStateRaw.__templateLayoutType : undefined
+  const __templateGenerationStrategy = typeof appStateRaw.__templateGenerationStrategy === "string" ? appStateRaw.__templateGenerationStrategy : undefined
 
   const appState = {
     viewBackgroundColor,
     gridModeEnabled,
     zenModeEnabled,
     ...(theme ? { theme } : {}),
+    ...(__templateLayoutType ? { __templateLayoutType } : {}),
+    ...(__templateGenerationStrategy ? { __templateGenerationStrategy } : {}),
   }
 
   return { elements, files, appState }
@@ -755,9 +1045,10 @@ function sanitizeInitialData(raw: unknown) {
 
 export function BoardPage() {
   const { boardId } = useParams()
+  const navigate = useNavigate()
   const containerRef = useRef<HTMLDivElement | null>(null)
   const backendApi = useApi()
-  const { token } = useAuth()
+  const { token, user: authUser } = useAuth()
 
   const persistenceKey = useMemo(() => `board:${boardId || "unknown"}`, [boardId])
 
@@ -805,6 +1096,13 @@ export function BoardPage() {
   const [shareError, setShareError] = useState<string | null>(null)
   const [shareNotice, setShareNotice] = useState<string | null>(null)
   const shareEmailRef = useRef<HTMLInputElement | null>(null)
+  const [onboardingOpen, setOnboardingOpen] = useState(false)
+  const [onboardingPrompt, setOnboardingPrompt] = useState("")
+  const [onboardingBusy, setOnboardingBusy] = useState(false)
+  const onboardingInputRef = useRef<HTMLInputElement | null>(null)
+  const onboardingSubmitRef = useRef<HTMLButtonElement | null>(null)
+  const [showTemplateReview, setShowTemplateReview] = useState(false)
+  const templateBeforeRef = useRef<{ elements: any[]; appState: any } | null>(null)
   const selectionSigRef = useRef<string>("")
   const defaultsSigRef = useRef<string>("")
   const [defaults, setDefaults] = useState<{
@@ -850,6 +1148,19 @@ export function BoardPage() {
   const pendingIncomingSceneRef = useRef<any | null>(null)
   const sendTimerRef = useRef<number | null>(null)
   const saveTimerRef = useRef<number | null>(null)
+  const lastHttpSaveAtRef = useRef<number>(0)
+  const [boardMeta, setBoardMeta] = useState<{ name: string; workspaceId: string; ownerId: string } | null>(null)
+  const [saveBusy, setSaveBusy] = useState(false)
+  const [saveError, setSaveError] = useState<string | null>(null)
+  const [saveNotice, setSaveNotice] = useState<string | null>(null)
+  const saveNoticeTimerRef = useRef<number | null>(null)
+  const [saveAsOpen, setSaveAsOpen] = useState(false)
+  const [saveAsName, setSaveAsName] = useState("")
+  const [saveAsWorkspaceId, setSaveAsWorkspaceId] = useState("")
+  const [saveAsWorkspaces, setSaveAsWorkspaces] = useState<{ workspaceId: string; name: string }[]>([])
+  const [saveAsBusy, setSaveAsBusy] = useState(false)
+  const [saveAsError, setSaveAsError] = useState<string | null>(null)
+  const saveAsNameRef = useRef<HTMLInputElement | null>(null)
 
   const toSerializableAppState = useCallback(
     (appState: any) => {
@@ -858,6 +1169,8 @@ export function BoardPage() {
         zenModeEnabled: Boolean(appState?.zenModeEnabled),
         gridModeEnabled: Boolean(gridModeEnabled),
         ...(typeof appState?.theme === "string" ? { theme: appState.theme } : {}),
+        ...(typeof appState?.__templateLayoutType === "string" ? { __templateLayoutType: appState.__templateLayoutType } : {}),
+        ...(typeof appState?.__templateGenerationStrategy === "string" ? { __templateGenerationStrategy: appState.__templateGenerationStrategy } : {}),
       }
     },
     [gridModeEnabled]
@@ -900,9 +1213,26 @@ export function BoardPage() {
       if (!boardId) return
       if (saveTimerRef.current) window.clearTimeout(saveTimerRef.current)
       saveTimerRef.current = window.setTimeout(async () => {
-        // If websocket is active, it already persists scenes server-side.
         const ws = wsRef.current
-        if (ws && ws.readyState === WebSocket.OPEN && wsAuthedRef.current) return
+        const wsActive = Boolean(ws && ws.readyState === WebSocket.OPEN && wsAuthedRef.current)
+
+        // Always autosave to the server. When websocket is active we normally throttle HTTP more,
+        // but for large scenes (common with pencil/freehand) websocket persistence/broadcast may be
+        // skipped or fail due to payload size, so keep HTTP saves frequent.
+        const now = Date.now()
+        let isLarge = false
+        try {
+          const bytes = new Blob([JSON.stringify(scene)]).size
+          isLarge = bytes > 900_000
+        } catch {
+          // If we can't size it, treat as large to be safe.
+          isLarge = true
+        }
+
+        const minIntervalMs = wsActive && !isLarge ? 10_000 : 1_200
+        if (now - lastHttpSaveAtRef.current < minIntervalMs) return
+        lastHttpSaveAtRef.current = now
+
         try {
           await backendApi.saveBoardScene(boardId, { scene })
         } catch {
@@ -912,6 +1242,19 @@ export function BoardPage() {
     },
     [backendApi, boardId]
   )
+
+  useEffect(() => {
+    if (!boardId || !token) return
+    const onVisibility = () => {
+      if (document.visibilityState !== "hidden") return
+      const scene = latestRef.current
+      if (!scene || typeof scene !== "object") return
+      // Best-effort flush when tab is backgrounded.
+      void backendApi.saveBoardScene(boardId, { scene }).catch(() => {})
+    }
+    document.addEventListener("visibilitychange", onVisibility)
+    return () => document.removeEventListener("visibilitychange", onVisibility)
+  }, [backendApi, boardId, token])
 
   const initialDataForExcalidraw = useMemo(() => {
     return (
@@ -930,82 +1273,105 @@ export function BoardPage() {
   useEffect(() => {
     if (!boardId || !token) return
 
-    const wsUrl = `${getWsUrl()}/ws`
-    const ws = new WebSocket(wsUrl)
-    wsRef.current = ws
-    wsAuthedRef.current = false
-
-    const close = () => {
-      wsAuthedRef.current = false
-      if (wsRef.current === ws) wsRef.current = null
+    // In React dev/StrictMode, effects may mount/unmount immediately to detect unsafe side effects.
+    // If we open a WebSocket synchronously and then close it during cleanup before it connects,
+    // browsers often log "WebSocket is closed before the connection is established."
+    // Deferring creation by a tick avoids that noise and prevents accidental rapid reconnect loops.
+    let ws: WebSocket | null = null
+    let cancelled = false
+    const flushToServer = () => {
+      const scene = latestRef.current
+      if (!scene || typeof scene !== "object") return
+      void backendApi.saveBoardScene(boardId, { scene }).catch(() => {})
     }
+    const t = window.setTimeout(() => {
+      if (cancelled) return
+      const wsUrl = `${getWsUrl()}/ws`
+      ws = new WebSocket(wsUrl)
+      wsRef.current = ws
+      wsAuthedRef.current = false
 
-    ws.addEventListener("open", () => {
-      try {
-        ws.send(JSON.stringify({ type: "auth", token, boardId }))
-      } catch {
-        // ignore
-      }
-    })
-
-    ws.addEventListener("message", (evt) => {
-      let msg: any
-      try {
-        msg = JSON.parse(String((evt as any).data || ""))
-      } catch {
-        return
+      const close = () => {
+        wsAuthedRef.current = false
+        if (wsRef.current === ws) wsRef.current = null
+        // If the websocket drops mid-edit, immediately flush the latest scene via HTTP
+        // so freehand/pencil strokes don't get lost on reconnect/refresh.
+        flushToServer()
       }
 
-      if (msg?.type === "auth:ok") {
-        wsAuthedRef.current = true
-        return
-      }
+      ws.addEventListener("open", () => {
+        try {
+          ws?.send(JSON.stringify({ type: "auth", token, boardId }))
+        } catch {
+          // ignore
+        }
+      })
 
-      if (msg?.type === "scene:sync" || msg?.type === "scene:update") {
-        const scene = msg?.scene
-        if (!scene || typeof scene !== "object") return
-        const api = apiRef.current
-        if (!api?.updateScene || !api?.getAppState) {
-          pendingIncomingSceneRef.current = scene
+      ws.addEventListener("message", (evt) => {
+        let msg: any
+        try {
+          msg = JSON.parse(String((evt as any).data || ""))
+        } catch {
           return
         }
 
-        const current = api.getAppState()
-        applyingRemoteRef.current = true
-        try {
-          api.updateScene({
-            elements: (scene as any).elements || [],
-            appState: {
-              ...current,
-              ...((scene as any).appState || {}),
-              // Keep local viewport stable.
-              scrollX: current.scrollX,
-              scrollY: current.scrollY,
-              zoom: current.zoom,
-            },
-          })
-        } catch {
-          // ignore
-        } finally {
-          window.setTimeout(() => {
-            applyingRemoteRef.current = false
-          }, 0)
+        if (msg?.type === "auth:ok") {
+          wsAuthedRef.current = true
+          return
         }
-      }
-    })
 
-    ws.addEventListener("close", close)
-    ws.addEventListener("error", close)
+        if (msg?.type === "scene:sync" || msg?.type === "scene:update") {
+          const scene = msg?.scene
+          if (!scene || typeof scene !== "object") return
+          const api = apiRef.current
+          if (!api?.updateScene || !api?.getAppState) {
+            pendingIncomingSceneRef.current = scene
+            return
+          }
+
+          const current = api.getAppState()
+          applyingRemoteRef.current = true
+          try {
+            api.updateScene({
+              elements: (scene as any).elements || [],
+              appState: {
+                ...current,
+                ...((scene as any).appState || {}),
+                // Keep local viewport stable.
+                scrollX: current.scrollX,
+                scrollY: current.scrollY,
+                zoom: current.zoom,
+              },
+            })
+          } catch {
+            // ignore
+          } finally {
+            window.setTimeout(() => {
+              applyingRemoteRef.current = false
+            }, 0)
+          }
+        }
+      })
+
+      ws.addEventListener("close", close)
+      ws.addEventListener("error", close)
+    }, 0)
 
     return () => {
-      try {
-        ws.close()
-      } catch {
-        // ignore
+      cancelled = true
+      window.clearTimeout(t)
+      if (ws) {
+        try {
+          ws.close()
+        } catch {
+          // ignore
+        }
       }
-      close()
+      wsAuthedRef.current = false
+      if (wsRef.current === ws) wsRef.current = null
+      flushToServer()
     }
-  }, [boardId, token])
+  }, [backendApi, boardId, token])
 
   useEffect(() => {
     if (!boardId || !token) return
@@ -1013,6 +1379,18 @@ export function BoardPage() {
     ;(async () => {
       try {
         const res = await backendApi.getBoard(boardId)
+        const b = res?.board
+        if (!cancelled && b && typeof b === "object") {
+          setBoardMeta({
+            name: String((b as any).name || "Board"),
+            workspaceId: String((b as any).workspaceId || ""),
+            ownerId: String((b as any).ownerId || ""),
+          })
+          const dismissedAt = (b as any).onboardingDismissedAt
+          if (dismissedAt == null || typeof dismissedAt !== "number") {
+            setOnboardingOpen(true)
+          }
+        }
         const scene = res?.board?.scene
         if (!scene || typeof scene !== "object") return
         if (cancelled) return
@@ -1047,6 +1425,67 @@ export function BoardPage() {
       cancelled = true
     }
   }, [backendApi, boardId, token])
+
+  const saveNow = useCallback(async () => {
+    if (!boardId) return
+    const scene = latestRef.current
+    if (!scene || typeof scene !== "object") return
+    setSaveBusy(true)
+    setSaveError(null)
+    try {
+      await backendApi.saveBoardScene(boardId, { scene })
+      setSaveNotice("Saved.")
+      if (saveNoticeTimerRef.current) window.clearTimeout(saveNoticeTimerRef.current)
+      saveNoticeTimerRef.current = window.setTimeout(() => setSaveNotice(null), 2000)
+    } catch (e: any) {
+      setSaveError(e?.message || "Save failed")
+      setSaveNotice(null)
+    } finally {
+      setSaveBusy(false)
+    }
+  }, [backendApi, boardId])
+
+  useEffect(() => {
+    return () => {
+      if (saveNoticeTimerRef.current) window.clearTimeout(saveNoticeTimerRef.current)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!saveAsOpen) return
+    setSaveAsError(null)
+    setSaveAsBusy(false)
+    const t = window.setTimeout(() => saveAsNameRef.current?.focus(), 0)
+
+    const defaultName = boardMeta?.name ? `${boardMeta.name} (copy)` : "Untitled (copy)"
+    setSaveAsName((v) => (v.trim() ? v : defaultName))
+    const personalWsId = authUser?.userId ? `ws_${authUser.userId}` : ""
+    if (personalWsId && !saveAsWorkspaceId) setSaveAsWorkspaceId(personalWsId)
+
+    let alive = true
+    ;(async () => {
+      try {
+        const res = await backendApi.listWorkspaces()
+        if (!alive) return
+        const ws = (res.workspaces || []).map((w: any) => ({
+          workspaceId: String(w.workspaceId || ""),
+          name: String(w.name || "Workspace"),
+        }))
+        setSaveAsWorkspaces(ws.filter((w) => w.workspaceId))
+        if (!saveAsWorkspaceId) {
+          const first = ws[0]?.workspaceId || personalWsId
+          if (first) setSaveAsWorkspaceId(first)
+        }
+      } catch {
+        // ignore; server defaults to personal workspace
+      }
+    })()
+
+    return () => {
+      alive = false
+      window.clearTimeout(t)
+    }
+  }, [saveAsOpen, backendApi, boardMeta?.name, authUser?.userId])
 
   const uiOptions = useMemo(
     () => ({
@@ -1212,14 +1651,17 @@ export function BoardPage() {
   }
 
   const generateAiTemplate = useCallback(
-    async (mode: "insert" | "replace") => {
+    async (mode: "insert" | "replace", promptOverride?: string) => {
       const api = apiRef.current
       if (!api?.getAppState || !api?.getSceneElements || !api?.updateScene) return
 
-      const prompt = aiPrompt.trim()
-      setAiBusy(true)
-      setAiError(null)
-      setAiNotice(null)
+      const prompt = (promptOverride != null ? promptOverride : aiPrompt).trim()
+      const fromOnboarding = promptOverride != null
+      if (!fromOnboarding) {
+        setAiBusy(true)
+        setAiError(null)
+        setAiNotice(null)
+      }
       try {
         const appState = api.getAppState()
         const zoom = typeof appState?.zoom?.value === "number" ? appState.zoom.value : 1
@@ -1234,9 +1676,15 @@ export function BoardPage() {
         if (prompt) {
           try {
             const res = await backendApi.generateTemplate({ prompt })
-            spec = res?.spec
-            if (spec) setAiNotice("Generated with Gemini.")
+            if (res?.error === "llm_not_configured") {
+              spec = undefined
+              if (!fromOnboarding) setAiNotice("Gemini isn't configured yet — using built‑in templates.")
+            } else {
+              spec = res?.spec
+              if (spec && !fromOnboarding) setAiNotice("Generated with Gemini.")
+            }
           } catch (err: any) {
+            if (!fromOnboarding) {
             // If Gemini isn't configured or fails, fall back to local templates.
             const status = typeof err?.status === "number" ? err.status : undefined
             let body: any = null
@@ -1257,42 +1705,167 @@ export function BoardPage() {
             } else {
               setAiNotice("Gemini failed — using built‑in templates.")
             }
+            }
             spec = undefined
           }
         }
 
-        const nextTemplate = generateTemplateElements({ prompt, centerX, centerY, spec })
+        const previousLayoutType = appState?.__templateLayoutType
+        const { elements: nextTemplate, layoutType, generationStrategy } = generateTemplateElements({
+          prompt,
+          centerX,
+          centerY,
+          spec,
+          previousLayoutType,
+        })
         const nextIds = nextTemplate.map((e: any) => e.id)
 
         const existing = api.getSceneElements() ?? []
         const nextElements = mode === "replace" ? nextTemplate : [...existing, ...nextTemplate]
 
+        templateBeforeRef.current = {
+          elements: existing.map((e: any) => ({ ...e })),
+          appState: { ...appState },
+        }
+
+        const strategyTag = `${mode}:${generationStrategy}`
         api.updateScene({
           elements: nextElements,
           appState: {
             ...appState,
             selectedElementIds: Object.fromEntries(nextIds.map((id: string) => [id, true])),
+            __templateLayoutType: layoutType,
+            __templateGenerationStrategy: strategyTag,
           },
           captureUpdate: "IMMEDIATELY",
         })
 
-        if (api?.setActiveTool) api.setActiveTool({ type: "selection" })
-        setAiOpen(false)
+        // Fit template to viewport and center; then switch to hand tool for pan/drag.
+        const bbox = getElementsBoundingBox(nextTemplate)
+        const padding = 80
+        const viewportWidth = typeof appState?.width === "number" ? appState.width : window.innerWidth
+        const viewportHeight = typeof appState?.height === "number" ? appState.height : window.innerHeight
+        if (bbox) {
+          const bboxW = bbox.maxX - bbox.minX + 2 * padding
+          const bboxH = bbox.maxY - bbox.minY + 2 * padding
+          const centerX = (bbox.minX + bbox.maxX) / 2
+          const centerY = (bbox.minY + bbox.maxY) / 2
+          const fitZoom = Math.min(
+            viewportWidth / bboxW,
+            viewportHeight / bboxH,
+            2
+          )
+          const zoomValue = Math.max(0.15, Math.min(2, fitZoom))
+          const scrollX = viewportWidth / 2 - centerX * zoomValue
+          const scrollY = viewportHeight / 2 - centerY * zoomValue
+          const afterState = api.getAppState()
+          api.updateScene({
+            appState: {
+              ...afterState,
+              scrollX,
+              scrollY,
+              zoom: { ...(afterState?.zoom || {}), value: zoomValue },
+              selectedElementIds: {},
+            },
+            captureUpdate: "IMMEDIATELY",
+          })
+        }
+
+        if (api?.setActiveTool) api.setActiveTool({ type: "hand" })
+        setShowTemplateReview(true)
+        if (!fromOnboarding) setAiOpen(false)
       } catch (e: any) {
-        setAiError(e?.message || "Failed to generate template")
+        if (!fromOnboarding) setAiError(e?.message || "Failed to generate template")
+        throw e
       } finally {
-        setAiBusy(false)
+        if (!fromOnboarding) setAiBusy(false)
       }
     },
     [aiPrompt, backendApi]
   )
 
+  const dismissOnboarding = useCallback(async () => {
+    if (!boardId) return
+    setOnboardingOpen(false)
+    try {
+      await backendApi.dismissBoardOnboarding(boardId)
+    } catch {
+      // best-effort; modal is already closed
+    }
+  }, [backendApi, boardId])
+
+  const submitOnboarding = useCallback(async () => {
+    const prompt = onboardingPrompt.trim() || "a collaborative board"
+    setOnboardingBusy(true)
+    try {
+      await generateAiTemplate("replace", prompt)
+      setOnboardingOpen(false)
+      if (boardMeta && boardId) {
+        try {
+          await backendApi.dismissBoardOnboarding(boardId)
+        } catch {
+          // Best-effort: modal already closed; onboarding may show again on next visit
+        }
+      }
+    } catch {
+      // leave modal open so user can retry or dismiss
+    } finally {
+      setOnboardingBusy(false)
+    }
+  }, [onboardingPrompt, generateAiTemplate, backendApi, boardId, boardMeta])
+
+  const keepTemplate = useCallback(() => {
+    setShowTemplateReview(false)
+    templateBeforeRef.current = null
+  }, [])
+
+  const discardTemplate = useCallback(() => {
+    const before = templateBeforeRef.current
+    const api = apiRef.current
+    if (before && api?.updateScene) {
+      api.updateScene({
+        elements: before.elements,
+        appState: before.appState,
+        captureUpdate: "IMMEDIATELY",
+      })
+      if (api?.setActiveTool) api.setActiveTool({ type: "hand" })
+    }
+    setShowTemplateReview(false)
+    templateBeforeRef.current = null
+  }, [])
+
+  const onboardingChips = [
+    "Brainstorm ideas",
+    "Create sequence diagram",
+    "Plan sprint timeline",
+    "Create system architecture diagram",
+    "Create technical spec draft",
+  ]
+
+  useEffect(() => {
+    if (!onboardingOpen) return
+    const t = window.setTimeout(() => onboardingInputRef.current?.focus(), 50)
+    return () => window.clearTimeout(t)
+  }, [onboardingOpen])
+
+  useEffect(() => {
+    if (!onboardingOpen) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.preventDefault()
+        dismissOnboarding()
+      }
+    }
+    document.addEventListener("keydown", onKey)
+    return () => document.removeEventListener("keydown", onKey)
+  }, [onboardingOpen, dismissOnboarding])
+
   const handleChange = useCallback(
     (elements: any, appState: any, files: any) => {
       const scene = {
-        elements,
+        elements: Array.isArray(elements) ? elements : [],
         appState: toSerializableAppState(appState),
-        files,
+        files: files && typeof files === "object" && !Array.isArray(files) ? files : {},
       }
 
       persist(scene)
@@ -1403,6 +1976,51 @@ export function BoardPage() {
     },
     [persist, toSerializableAppState, queueSaveScene, queueSendScene]
   )
+
+  const handleExcalidrawApi = useCallback((api: any) => {
+    apiRef.current = api
+
+    // Defer calling Excalidraw API methods by a tick. Calling `setActiveTool` / `updateScene`
+    // synchronously during initial mount can trigger dev warnings like:
+    // "Can't call setState on a component that is not yet mounted."
+    window.setTimeout(() => {
+      if (apiRef.current !== api) return
+
+      if (!initialToolSetRef.current) {
+        initialToolSetRef.current = true
+        try {
+          api?.setActiveTool?.({ type: "hand" })
+        } catch {
+          // ignore
+        }
+      }
+
+      const pending = pendingIncomingSceneRef.current
+      if (pending && api?.updateScene && api?.getAppState) {
+        pendingIncomingSceneRef.current = null
+        const current = api.getAppState()
+        applyingRemoteRef.current = true
+        try {
+          api.updateScene({
+            elements: (pending as any).elements || [],
+            appState: {
+              ...current,
+              ...((pending as any).appState || {}),
+              scrollX: current.scrollX,
+              scrollY: current.scrollY,
+              zoom: current.zoom,
+            },
+          })
+        } catch {
+          // ignore
+        } finally {
+          window.setTimeout(() => {
+            applyingRemoteRef.current = false
+          }, 0)
+        }
+      }
+    }, 0)
+  }, [])
 
   useEffect(() => {
     if (!shapesOpen) return
@@ -2019,20 +2637,6 @@ export function BoardPage() {
                       )}
                     </div>
 
-                    {(isDraw || activeToolType === "freedraw") && (
-                      <button
-                        type="button"
-                        className={topIconBtnClass}
-                        aria-label="Eraser"
-                        title="Eraser"
-                        onClick={() => {
-                          setTopMenuOpen(null)
-                          setTool("eraser")
-                        }}
-                      >
-                        <PencilEraserIcon />
-                      </button>
-                    )}
                   </>
                 )}
 
@@ -2165,38 +2769,6 @@ export function BoardPage() {
             title="Text"
           >
             <TextBoxIcon />
-          </button>
-          <button
-            type="button"
-            className={`${iconBtnClass} ${
-              activeToolType === "freedraw" && freedrawMode === "pencil" ? iconBtnActiveClass : ""
-            }`}
-            onClick={() => {
-              setFreedrawMode("pencil")
-              setTool("freedraw")
-            }}
-            title="Pencil"
-          >
-            <PencilIcon />
-          </button>
-          <button
-            type="button"
-            className={`${iconBtnClass} ${
-              activeToolType === "freedraw" && freedrawMode === "highlighter" ? iconBtnActiveClass : ""
-            }`}
-            onClick={() => {
-              // Highlighter ≈ freedraw with higher width + low opacity.
-              updateAppState({
-                currentItemStrokeWidth: 12,
-                currentItemOpacity: 35,
-                currentItemStrokeColor: "#facc15",
-              })
-              setFreedrawMode("highlighter")
-              setTool("freedraw")
-            }}
-            title="Highlighter"
-          >
-            <HighlighterIcon />
           </button>
 
           <div className="relative" data-shapes-popover-root>
@@ -2362,27 +2934,56 @@ export function BoardPage() {
         </div>
       </div>
 
+      {/* Keep / Discard template review bar (after AI template is placed) */}
+      {showTemplateReview && (
+        <div className="pointer-events-auto absolute bottom-24 left-1/2 z-50 -translate-x-1/2">
+          <div className="inline-flex items-center gap-3 rounded-2xl border border-border bg-surface/95 px-4 py-2.5 shadow-lg backdrop-blur">
+            <span className="text-sm font-medium text-text-primary">Template added.</span>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                className={pillBtnClass}
+                onClick={keepTemplate}
+                aria-label="Keep template"
+              >
+                Keep
+              </button>
+              <button
+                type="button"
+                className={pillBtnClass}
+                onClick={discardTemplate}
+                aria-label="Discard template"
+              >
+                Discard
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Bottom-center AI template generator */}
       <div className="pointer-events-none absolute bottom-4 left-1/2 z-50 -translate-x-1/2">
-        <div className="pointer-events-auto inline-flex items-center gap-2">
-          <button
-            type="button"
-            className="inline-flex h-12 w-12 items-center justify-center rounded-2xl border border-border bg-surface/90 text-text-secondary shadow-md backdrop-blur hover:bg-toolbar hover:text-text-primary active:translate-y-px transition duration-fast"
-            onClick={() => setAiOpen(true)}
-            aria-label="AI template generator"
-            title="AI template generator"
-          >
-            <AiSparklesIcon />
-          </button>
-          <button
-            type="button"
-            className="inline-flex h-12 w-12 items-center justify-center rounded-2xl border border-border bg-surface/90 text-text-secondary shadow-md backdrop-blur hover:bg-toolbar hover:text-text-primary active:translate-y-px transition duration-fast"
-            onClick={() => setShareOpen(true)}
-            aria-label="Share board"
-            title="Share board"
-          >
-            <ShareIcon />
-          </button>
+        <div className="pointer-events-auto">
+          <div className="inline-flex items-center gap-2">
+            <button
+              type="button"
+              className="inline-flex h-12 items-center justify-center rounded-2xl border border-border bg-surface/90 px-4 text-sm font-medium text-text-secondary shadow-md backdrop-blur hover:bg-toolbar hover:text-text-primary active:translate-y-px transition duration-fast"
+              onClick={() => setAiOpen(true)}
+              aria-label="Need Help Generating"
+              title="Need Help Generating"
+            >
+              Need Help Generating
+            </button>
+            <button
+              type="button"
+              className="inline-flex h-12 items-center justify-center rounded-2xl border border-border bg-surface/90 px-4 text-sm font-medium text-text-secondary shadow-md backdrop-blur hover:bg-toolbar hover:text-text-primary active:translate-y-px transition duration-fast"
+              onClick={() => setShareOpen(true)}
+              aria-label="Collaborate"
+              title="Collaborate"
+            >
+              Collaborate
+            </button>
+          </div>
         </div>
       </div>
 
@@ -2458,7 +3059,7 @@ export function BoardPage() {
               <div>
                 <div className="text-base font-semibold text-text-primary">Share this board</div>
                 <div className="mt-1 text-sm text-text-secondary">
-                  Enter an email address. We’ll grant access to collaborate on this board.
+                  Enter an email address. They’ll get an in-app notification and this board will appear on their dashboard.
                 </div>
               </div>
               <button
@@ -2479,7 +3080,10 @@ export function BoardPage() {
                   ref={shareEmailRef}
                   value={shareEmail}
                   onChange={(e) => setShareEmail(e.target.value)}
+                  onKeyDown={(e) => e.stopPropagation()}
                   type="email"
+                  autoComplete="email"
+                  maxLength={320}
                   placeholder="teammate@example.com"
                   className="mt-2 w-full rounded-2xl border border-border bg-surface px-4 py-3 text-sm text-text-primary shadow-xs focus:outline-none focus:ring-2 focus:ring-primary/30"
                 />
@@ -2524,7 +3128,7 @@ export function BoardPage() {
                   setShareNotice(null)
                   try {
                     await backendApi.shareBoard(boardId, { email: shareEmail.trim() })
-                    setShareNotice("Shared. Send them the link above.")
+                    setShareNotice("Shared. They’ll see it on their dashboard.")
                   } catch (e: any) {
                     if (e?.status === 404) setShareError("No user found with that email.")
                     else if (e?.status === 403) setShareError("You don’t have permission to share this board.")
@@ -2541,46 +3145,104 @@ export function BoardPage() {
         </div>
       )}
 
-      <Excalidraw
-        excalidrawAPI={(api) => {
-          apiRef.current = api
-          if (!initialToolSetRef.current) {
-            initialToolSetRef.current = true
-            try {
-              api.setActiveTool?.({ type: "hand" })
-            } catch {
-              // ignore
-            }
-          }
+      {onboardingOpen && (
+        <div className="pointer-events-auto absolute inset-0 z-[60]" role="dialog" aria-modal="true" aria-labelledby="onboarding-title">
+          <div
+            className="absolute inset-0 bg-black/25 backdrop-blur-sm"
+            onClick={dismissOnboarding}
+            aria-hidden="true"
+          />
+          <div
+            className="absolute left-1/2 top-1/2 w-[min(520px,calc(100%-2rem))] -translate-x-1/2 -translate-y-1/2 rounded-2xl border border-border bg-surface p-6 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && (e.target as HTMLElement).tagName !== "TEXTAREA") {
+                e.preventDefault()
+                submitOnboarding()
+              }
+              if (e.key === "Tab") {
+                const target = e.target as HTMLElement
+                if (e.shiftKey && target === onboardingInputRef.current) {
+                  e.preventDefault()
+                  onboardingSubmitRef.current?.focus()
+                } else if (!e.shiftKey && target === onboardingSubmitRef.current) {
+                  e.preventDefault()
+                  onboardingInputRef.current?.focus()
+                }
+              }
+            }}
+          >
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h2 id="onboarding-title" className="text-lg font-semibold text-text-primary">
+                  Hey {authUser?.displayName || "there"}, what are we working on today?
+                </h2>
+                <p className="mt-1.5 text-sm text-text-secondary">
+                  AI can help generate structure for your board — describe what you need and we’ll add notes, sections, and shapes to get you started.
+                </p>
+              </div>
+              <button
+                type="button"
+                className={iconBtnClass}
+                onClick={dismissOnboarding}
+                aria-label="Close"
+                title="Close"
+                data-dismiss
+              >
+                ×
+              </button>
+            </div>
 
-          const pending = pendingIncomingSceneRef.current
-          if (pending && api?.updateScene && api?.getAppState) {
-            pendingIncomingSceneRef.current = null
-            const current = api.getAppState()
-            applyingRemoteRef.current = true
-            try {
-              api.updateScene({
-                elements: (pending as any).elements || [],
-                appState: {
-                  ...current,
-                  ...((pending as any).appState || {}),
-                  scrollX: current.scrollX,
-                  scrollY: current.scrollY,
-                  zoom: current.zoom,
-                },
-              })
-            } catch {
-              // ignore
-            } finally {
-              window.setTimeout(() => {
-                applyingRemoteRef.current = false
-              }, 0)
-            }
-          }
-        }}
+            <input
+              ref={onboardingInputRef}
+              type="text"
+              value={onboardingPrompt}
+              onChange={(e) => setOnboardingPrompt(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault()
+                  submitOnboarding()
+                }
+              }}
+              placeholder="I want to create…"
+              className="mt-4 w-full rounded-xl border border-border bg-surface px-4 py-3 text-sm text-text-primary placeholder:text-text-muted shadow-xs focus:outline-none focus:ring-2 focus:ring-primary/30"
+              disabled={onboardingBusy}
+              aria-label="Describe what you want to create"
+            />
+
+            <div className="mt-3 flex flex-wrap gap-2">
+              {onboardingChips.map((label) => (
+                <button
+                  key={label}
+                  type="button"
+                  className="rounded-full border border-border bg-surface px-3 py-1.5 text-xs font-medium text-text-secondary shadow-xs hover:bg-toolbar hover:text-text-primary transition-colors"
+                  onClick={() => setOnboardingPrompt(label)}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+
+            <div className="mt-5 flex justify-end">
+              <button
+                ref={onboardingSubmitRef}
+                type="button"
+                className={pillBtnClass}
+                onClick={submitOnboarding}
+                disabled={onboardingBusy}
+              >
+                {onboardingBusy ? "Generating…" : "Generate"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <Excalidraw
+        excalidrawAPI={handleExcalidrawApi}
         initialData={initialDataForExcalidraw as any}
         gridModeEnabled={gridModeEnabled}
-        handleKeyboardGlobally
+        handleKeyboardGlobally={!aiOpen && !shareOpen && !onboardingOpen && !zoomEditing}
         onChange={handleChange}
         UIOptions={uiOptions}
       />

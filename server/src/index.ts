@@ -1,5 +1,9 @@
+import path from "path"
+import { fileURLToPath } from "url"
 import dotenv from "dotenv"
-dotenv.config()
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url))
+dotenv.config({ path: path.join(__dirname, "..", ".env") })
 
 import Fastify from "fastify"
 import cors from "@fastify/cors"
@@ -21,7 +25,9 @@ const configuredOrigins = (process.env.FRONTEND_ORIGIN || "http://localhost:5173
 
 const isDev = process.env.NODE_ENV !== "production"
 
-const app = Fastify({ logger: true })
+// Pencil/freehand drawings can produce very large scenes. Increase body limit so
+// `/api/boards/:boardId/scene` and `/api/boards/:boardId/duplicate` can accept them.
+const app = Fastify({ logger: true, bodyLimit: 50 * 1024 * 1024 })
 
 await app.register(cors, {
   origin: (origin, cb) => {
@@ -32,6 +38,9 @@ await app.register(cors, {
     }
     return cb(null, false)
   },
+  // `@fastify/cors` expects a comma-separated string (array support is not reliable across versions).
+  methods: "GET,HEAD,POST,PUT,PATCH,DELETE,OPTIONS",
+  allowedHeaders: ["content-type", "authorization"],
 })
 await app.register(rateLimit, { max: 300, timeWindow: "1 minute" })
 await app.register(sensible)
@@ -104,6 +113,149 @@ async function getBoardAndAssertAccess(args: { boardId: string; uid: string }) {
   return { snap, board, allowed }
 }
 
+const SCENE_INLINE_LIMIT_BYTES = 900_000
+const SCENE_WS_ACCEPT_LIMIT_BYTES = 2_500_000
+// Firestore document limit is 1 MiB. Chunk by bytes so each doc stays under it.
+const SCENE_CHUNK_MAX_BYTES = 900_000
+
+/** Split a string into chunks that each stay under maxBytesPerChunk when encoded as UTF-8. */
+function chunkStringByBytes(input: string, maxBytesPerChunk: number): string[] {
+  const out: string[] = []
+  let start = 0
+  while (start < input.length) {
+    let end = start
+    let byteCount = 0
+    while (end < input.length) {
+      const charBytes = Buffer.byteLength(input[end]!, "utf8")
+      if (byteCount + charBytes > maxBytesPerChunk && byteCount > 0) break
+      byteCount += charBytes
+      end++
+    }
+    out.push(input.slice(start, end))
+    start = end
+  }
+  return out
+}
+
+async function deleteSceneChunks(db: any, boardId: string) {
+  // Best-effort delete all existing chunk docs.
+  try {
+    const snap = await db.collection("boards").doc(boardId).collection("sceneChunks").get()
+    if (snap.empty) return
+    let batch = db.batch()
+    let n = 0
+    for (const doc of snap.docs) {
+      batch.delete(doc.ref)
+      n++
+      if (n >= 400) {
+        await batch.commit()
+        batch = db.batch()
+        n = 0
+      }
+    }
+    if (n) await batch.commit()
+  } catch {
+    // ignore cleanup errors
+  }
+}
+
+async function readBoardScene(db: any, boardId: string, board: any) {
+  if (!board) return null
+  // Prefer boardScenes first so we never need to touch the board doc when saving.
+  const sceneDoc = await db.collection("boardScenes").doc(boardId).get()
+  const sceneData = sceneDoc.exists ? (sceneDoc.data() as any) : null
+  if (typeof sceneData?.sceneJson === "string") {
+    try {
+      return JSON.parse(sceneData.sceneJson) as any
+    } catch {
+      return null
+    }
+  }
+  // Chunked: detect by presence of sceneChunks (do not rely on board.sceneChunked).
+  const q = await db.collection("boards").doc(boardId).collection("sceneChunks").orderBy("index", "asc").get()
+  if (!q.empty) {
+    const parts = q.docs.map((d: any) => String((d.data() as any)?.data || ""))
+    const json = parts.join("")
+    try {
+      return JSON.parse(json) as any
+    } catch {
+      return null
+    }
+  }
+  if (typeof board.sceneJson === "string") {
+    try {
+      return JSON.parse(board.sceneJson) as any
+    } catch {
+      return null
+    }
+  }
+  return board.scene || null
+}
+
+async function writeBoardScene(db: any, boardId: string, scene: any, now: number) {
+  let json: string
+  try {
+    json = JSON.stringify(scene)
+  } catch {
+    throw Object.assign(new Error("Scene is not serializable"), { statusCode: 400 })
+  }
+  const bytes = Buffer.byteLength(json, "utf8")
+
+  if (bytes <= SCENE_INLINE_LIMIT_BYTES) {
+    // Only write to boardScenes. Do not update the board doc - it may contain an invalid
+    // "scene" field; any merge triggers Firestore to validate the whole doc and throw.
+    await db.collection("boardScenes").doc(boardId).set({ sceneJson: json, updatedAt: now }, { merge: true })
+    return { stored: "inline" as const, bytes }
+  }
+
+  const chunks = chunkStringByBytes(json, SCENE_CHUNK_MAX_BYTES)
+  // Replace existing chunks entirely to avoid stale tail docs.
+  await deleteSceneChunks(db, boardId)
+
+  // Write new chunks in batches.
+  let batch = db.batch()
+  let n = 0
+  for (let i = 0; i < chunks.length; i++) {
+    const ref = db.collection("boards").doc(boardId).collection("sceneChunks").doc(String(i))
+    batch.set(
+      ref,
+      {
+        index: i,
+        data: chunks[i],
+        updatedAt: now,
+      },
+      { merge: true }
+    )
+    n++
+    if (n >= 400) {
+      await batch.commit()
+      batch = db.batch()
+      n = 0
+    }
+  }
+  if (n) await batch.commit()
+
+  // Do not update the board doc - it may contain an invalid "scene" field; any merge can throw.
+
+  return { stored: "chunked" as const, bytes, chunks: chunks.length }
+}
+
+async function upsertUserNotification(args: {
+  toUid: string
+  notificationId: string
+  data: Record<string, unknown>
+}) {
+  const db = getDb()
+  const ref = db.collection("users").doc(args.toUid).collection("notifications").doc(args.notificationId)
+  await ref.set(
+    {
+      notificationId: ref.id,
+      ...args.data,
+    },
+    { merge: true }
+  )
+}
+
 app.get("/api/health", async () => {
   const dbId = process.env.FIRESTORE_DATABASE_ID || "colab"
   return { ok: true, firestoreDatabaseId: dbId }
@@ -125,10 +277,10 @@ const TemplateSpecSchema = z.discriminatedUnion("kind", [
         z.object({
           title: z.string().min(1).max(40),
           cards: z.array(z.string().min(1).max(120)).max(8),
-          color: z.string().optional(), // hex like #RRGGBB (optional)
+          color: z.string().optional(),
         })
       )
-      .min(3)
+      .min(2)
       .max(5),
   }),
   z.object({
@@ -142,7 +294,7 @@ const TemplateSpecSchema = z.discriminatedUnion("kind", [
           color: z.string().optional(),
         })
       )
-      .min(3)
+      .min(2)
       .max(4),
   }),
   z.object({
@@ -176,40 +328,42 @@ app.post("/api/ai/template", { preHandler: requireAuth }, async (req: any, reply
 
   const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_AI_API_KEY || process.env.GOOGLE_API_KEY
   if (!apiKey) {
-    return reply.status(501).send({
-      ok: false,
+    return reply.send({
+      ok: true,
+      spec: null,
       error: "llm_not_configured",
       ...(isDev ? { message: "Set GEMINI_API_KEY in the server environment." } : {}),
     })
   }
 
-  const modelName = process.env.GEMINI_MODEL || "gemini-1.5-flash"
+  const modelName = process.env.GEMINI_MODEL || "gemini-2.5-flash"
   const genAI = new GoogleGenerativeAI(apiKey)
   const model = genAI.getGenerativeModel({ model: modelName })
 
   const instruction = `
-You are a collaborative whiteboard template designer.
-Generate a highly organized, aesthetically pleasing board template based on the user's prompt.
+You are a collaborative whiteboard template designer. Generate a board template that matches the user's intent and feels purpose-built for their prompt.
 
-Return ONLY a single JSON object that matches ONE of these shapes (no markdown, no code fences):
+RULES:
+1) Board title (mandatory): Generate a short, summarized title in 3–7 words. The title must describe the outcome or purpose of the board, not the user's instructions. Never use the raw user prompt as the title. Do not reuse instructional phrasing or system messages in the title. Examples: "Mobile App Sprint Plan", "Product Launch Brainstorm", "Q3 Goals Retro", "API Redesign Workshop". Titles should feel human-written, concise, and scannable.
+2) Content variation: Every card, note, or prompt must have distinct, context-aware text. Do not repeat the same placeholder (e.g. "Idea…" or "Add a note…") across multiple items. Each item should suggest a different angle or action relevant to the prompt.
+3) Structure: Vary columns/sections based on prompt. Use 2 columns for simple flows (e.g. pros/cons, before/after), 3 for classic kanban/retro, 4–5 when the user asks for more phases or categories. Match the layout to the intent (planning → sections with hints; brainstorm → varied prompts; diagram → structure the user described).
+4) Colors: Use hex colors only when they add clarity (e.g. status columns). Optional; omit if not needed.
 
-1) Kanban:
-{ "kind":"kanban", "title": "...", "columns":[ { "title":"...", "cards":["..."], "color":"#RRGGBB" } ] }
+Return ONLY a single JSON object (no markdown, no code fences):
 
-2) Retro:
-{ "kind":"retro", "title": "...", "columns":[ { "title":"...", "cards":["..."], "color":"#RRGGBB" } ] }
+1) Kanban (2–5 columns):
+{ "kind":"kanban", "title": "...", "columns":[ { "title":"...", "cards":["...", "...", "..."], "color":"#RRGGBB" } ] }
 
-3) Brainstorm:
-{ "kind":"brainstorm", "title":"...", "prompts":["..."] }
+2) Retro (2–4 columns):
+{ "kind":"retro", "title": "...", "columns":[ { "title":"...", "cards":["...", "..."], "color":"#RRGGBB" } ] }
 
-4) Kickoff:
+3) Brainstorm (6–16 distinct prompts):
+{ "kind":"brainstorm", "title":"...", "prompts":["...", "...", "..."] }
+
+4) Kickoff (4–10 sections):
 { "kind":"kickoff", "title":"...", "sections":[ { "title":"...", "hint":"..." } ] }
 
-Constraints:
-- Keep titles concise.
-- Prefer 3 columns for kanban/retro unless prompt strongly suggests otherwise.
-- Use short, actionable starter card text (no long paragraphs).
-- If you include "color", it must be a hex string like "#22C55E".
+- Each card/prompt/hint must be unique and relevant to the user's topic.
 - Do not include any additional keys.
 `.trim()
 
@@ -246,6 +400,41 @@ ${body.prompt}
 app.get("/api/me", { preHandler: requireAuth }, async (req: any) => {
   const user = (req as AuthedRequest).user
   return { user }
+})
+
+app.get("/api/notifications", { preHandler: requireAuth }, async (req: any) => {
+  const user = (req as AuthedRequest).user
+  const limitRaw = (req.query as any)?.limit
+  const limit = Math.max(1, Math.min(100, Number(limitRaw || 50) || 50))
+
+  const db = getDb()
+  const q = await db
+    .collection("users")
+    .doc(user.uid)
+    .collection("notifications")
+    .orderBy("createdAt", "desc")
+    .limit(limit)
+    .get()
+
+  const notifications = q.docs.map((d) => d.data() as any)
+  return { notifications }
+})
+
+app.post("/api/notifications/:notificationId/read", { preHandler: requireAuth }, async (req: any) => {
+  const user = (req as AuthedRequest).user
+  const notificationId = String(req.params.notificationId || "")
+  if (!notificationId) return { ok: true }
+
+  const db = getDb()
+  const now = Date.now()
+  await db
+    .collection("users")
+    .doc(user.uid)
+    .collection("notifications")
+    .doc(notificationId)
+    .set({ readAt: now, updatedAt: now }, { merge: true })
+
+  return { ok: true }
 })
 
 async function ensurePersonalWorkspace(uid: string, nameHint?: string) {
@@ -298,6 +487,12 @@ app.post("/api/boards", { preHandler: requireAuth }, async (req: any, reply) => 
 
   const boardId = `b_${crypto.randomUUID()}`
   const now = Date.now()
+  const initialSceneJson = JSON.stringify({
+    elements: [],
+    appState: { viewBackgroundColor: "#ffffff" },
+    files: {},
+  })
+  await db.collection("boardScenes").doc(boardId).set({ sceneJson: initialSceneJson, updatedAt: now })
   await db
     .collection("boards")
     .doc(boardId)
@@ -308,7 +503,8 @@ app.post("/api/boards", { preHandler: requireAuth }, async (req: any, reply) => 
       ownerId: user.uid,
       collaboratorIds: [],
       collaboratorEmails: [],
-      scene: { elements: [], appState: { viewBackgroundColor: "#ffffff" }, files: {} },
+      sceneChunked: false,
+      sceneChunksCount: 0,
       updatedAt: now,
       createdAt: now,
     })
@@ -325,6 +521,9 @@ app.get("/api/boards/:boardId", { preHandler: requireAuth }, async (req: any, re
   if (!board) return reply.notFound()
   if (!allowed) return reply.forbidden()
 
+  const db = getDb()
+  const scene = await readBoardScene(db, boardId, board)
+
   return {
     board: {
       boardId: board.boardId,
@@ -333,11 +532,49 @@ app.get("/api/boards/:boardId", { preHandler: requireAuth }, async (req: any, re
       ownerId: board.ownerId,
       collaboratorIds: board.collaboratorIds || [],
       collaboratorEmails: board.collaboratorEmails || [],
-      scene: board.scene || null,
+      scene,
       updatedAt: board.updatedAt || 0,
       createdAt: board.createdAt || 0,
+      onboardingDismissedAt: board.onboardingDismissedAt ?? null,
     },
   }
+})
+
+app.patch("/api/boards/:boardId", { preHandler: requireAuth }, async (req: any, reply) => {
+  const user = (req as AuthedRequest).user
+  const boardId = String(req.params.boardId || "")
+  if (!boardId) return reply.status(400).send({ ok: false, error: "bad_request", message: "boardId required" })
+
+  let body: { onboardingDismissedAt: number }
+  try {
+    body = z.object({ onboardingDismissedAt: z.number().int().positive() }).parse(req.body ?? {})
+  } catch {
+    return reply.status(400).send({ ok: false, error: "bad_request", message: "onboardingDismissedAt required" })
+  }
+
+  const { board, allowed } = await getBoardAndAssertAccess({ boardId, uid: user.uid })
+  if (!board) return reply.send({ ok: true })
+  if (!allowed) return reply.forbidden()
+
+  const now = Date.now()
+  await getDb()
+    .collection("boards")
+    .doc(boardId)
+    .set({ onboardingDismissedAt: body.onboardingDismissedAt, updatedAt: now }, { merge: true })
+
+  return { ok: true }
+})
+
+const putSceneBodySchema = z.object({
+  scene: z
+    .object({
+      elements: z.array(z.any()).default([]),
+      appState: z.record(z.any()).optional().default({}),
+      files: z.record(z.any()).optional().default({}),
+    })
+    .passthrough()
+    .optional()
+    .default({}),
 })
 
 app.put("/api/boards/:boardId/scene", { preHandler: requireAuth }, async (req: any, reply) => {
@@ -345,35 +582,108 @@ app.put("/api/boards/:boardId/scene", { preHandler: requireAuth }, async (req: a
   const boardId = String(req.params.boardId || "")
   if (!boardId) return reply.notFound()
 
+  let body: z.infer<typeof putSceneBodySchema>
+  try {
+    body = putSceneBodySchema.parse(req.body ?? {})
+  } catch (err: any) {
+    if (err?.name === "ZodError") {
+      return reply.status(400).send({
+        ok: false,
+        error: "bad_request",
+        ...(isDev ? { message: err?.message || "Invalid scene payload" } : {}),
+      })
+    }
+    throw err
+  }
+
+  try {
+    const { board, allowed } = await getBoardAndAssertAccess({ boardId, uid: user.uid })
+    if (!board) return reply.notFound()
+    if (!allowed) return reply.forbidden()
+
+    // Normalize to a plain JSON-serializable object (strip undefined, NaN, etc.) so Firestore never sees invalid types.
+    let scene: any
+    try {
+      scene = JSON.parse(JSON.stringify(body.scene))
+    } catch (_) {
+      return reply.status(400).send({ ok: false, error: "bad_request", message: "Scene is not serializable" })
+    }
+
+    const now = Date.now()
+    const db = getDb()
+    await writeBoardScene(db, boardId, scene, now)
+    return { ok: true, updatedAt: now }
+  } catch (err: any) {
+    const sceneBytes = Buffer.byteLength(JSON.stringify(body?.scene ?? {}), "utf8")
+    req.log.error(
+      { err, boardId, sceneBytes, message: err?.message },
+      "PUT /api/boards/:boardId/scene failed"
+    )
+    throw err
+  }
+})
+
+app.post("/api/boards/:boardId/duplicate", { preHandler: requireAuth }, async (req: any, reply) => {
+  const user = (req as AuthedRequest).user
+  const boardId = String(req.params.boardId || "")
+  if (!boardId) return reply.notFound()
+
   const body = z
     .object({
+      name: z.string().min(1).max(120),
+      workspaceId: z.string().min(1).optional(),
       scene: z
         .object({
           elements: z.array(z.any()),
           appState: z.record(z.any()),
           files: z.record(z.any()),
         })
-        .passthrough(),
+        .passthrough()
+        .optional(),
     })
     .parse(req.body)
 
-  const jsonSize = Buffer.byteLength(JSON.stringify(body.scene), "utf8")
-  if (jsonSize > 900_000) {
-    return reply.status(413).send({
-      ok: false,
-      error: "payload_too_large",
-      ...(isDev ? { message: "Scene too large to store in Firestore doc." } : {}),
-    })
-  }
+  const db = getDb()
 
+  // Must be able to read the source board to duplicate it.
   const { board, allowed } = await getBoardAndAssertAccess({ boardId, uid: user.uid })
   if (!board) return reply.notFound()
   if (!allowed) return reply.forbidden()
 
+  // Destination workspace: default to user's personal workspace unless an owned workspace is specified.
+  const personal = await ensurePersonalWorkspace(user.uid, user.name || undefined)
+  const destWorkspaceId = body.workspaceId || String(personal.workspaceId)
+
+  const wsSnap = await db.collection("workspaces").doc(destWorkspaceId).get()
+  if (!wsSnap.exists) return reply.notFound()
+  if (String((wsSnap.data() as any).ownerId || "") !== user.uid) return reply.forbidden()
+
+  const sourceScene = body.scene || (await readBoardScene(db, boardId, board)) || {
+    elements: [],
+    appState: { viewBackgroundColor: "#ffffff" },
+    files: {},
+  }
+
+  const newBoardId = `b_${crypto.randomUUID()}`
   const now = Date.now()
-  const db = getDb()
-  await db.collection("boards").doc(boardId).set({ scene: body.scene, updatedAt: now }, { merge: true })
-  return { ok: true, updatedAt: now }
+  await db
+    .collection("boards")
+    .doc(newBoardId)
+    .set({
+      boardId: newBoardId,
+      workspaceId: destWorkspaceId,
+      name: body.name,
+      ownerId: user.uid,
+      collaboratorIds: [],
+      collaboratorEmails: [],
+      duplicatedFromBoardId: boardId,
+      updatedAt: now,
+      createdAt: now,
+    })
+
+  await writeBoardScene(db, newBoardId, sourceScene, now)
+
+  return { boardId: newBoardId }
 })
 
 app.post("/api/boards/:boardId/share", { preHandler: requireAuth }, async (req: any, reply) => {
@@ -418,7 +728,43 @@ app.post("/api/boards/:boardId/share", { preHandler: requireAuth }, async (req: 
       { merge: true }
     )
 
+  // In-app notification (no email is sent).
+  await upsertUserNotification({
+    toUid: target.uid,
+    notificationId: `board_shared_${boardId}`,
+    data: {
+      kind: "board_shared",
+      boardId,
+      boardName: String(board?.name || "Board"),
+      fromUid: user.uid,
+      fromEmail: user.email || null,
+      fromName: user.name || null,
+      createdAt: now,
+      readAt: null,
+      updatedAt: now,
+    },
+  })
+
   return { ok: true }
+})
+
+app.get("/api/boards/shared-with-me", { preHandler: requireAuth }, async (req: any) => {
+  const user = (req as AuthedRequest).user
+  const db = getDb()
+
+  const q = await db.collection("boards").where("collaboratorIds", "array-contains", user.uid).get()
+  const boards = q.docs
+    .map((d) => d.data() as any)
+    .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0))
+    .map((b) => ({
+      boardId: b.boardId,
+      name: b.name,
+      updatedAt: b.updatedAt || 0,
+      ownerId: b.ownerId || null,
+      workspaceId: b.workspaceId || null,
+    }))
+
+  return { boards }
 })
 
 app.get("/api/workspaces/:workspaceId/boards", { preHandler: requireAuth }, async (req: any, reply) => {
@@ -536,7 +882,9 @@ wss.on("connection", (ws) => {
         ctx.boardId = boardId
         joinRoom(boardId, ws)
         ws.send(JSON.stringify({ type: "auth:ok" }))
-        ws.send(JSON.stringify({ type: "scene:sync", scene: board.scene || null }))
+        const db = getDb()
+        const scene = await readBoardScene(db, boardId, board)
+        ws.send(JSON.stringify({ type: "scene:sync", scene }))
       } catch (e: any) {
         ws.send(JSON.stringify({ type: "auth:error", error: "unauthorized", message: isDev ? e?.message : undefined }))
         try {
@@ -557,25 +905,34 @@ wss.on("connection", (ws) => {
 
       const scene = msg?.scene
       if (!scene || typeof scene !== "object") return
+      let jsonSize = 0
       try {
-        const jsonSize = Buffer.byteLength(JSON.stringify(scene), "utf8")
-        if (jsonSize > 900_000) return
+        jsonSize = Buffer.byteLength(JSON.stringify(scene), "utf8")
+        if (jsonSize > SCENE_WS_ACCEPT_LIMIT_BYTES) return
       } catch {
         return
       }
 
+      // Large scenes (common with pencil/freehand) are expensive to persist on every WS tick
+      // because chunking rewrites many docs. For these, rely on the client's HTTP autosave.
+      if (jsonSize > SCENE_INLINE_LIMIT_BYTES) return
+
       try {
         const db = getDb()
-        await db.collection("boards").doc(ctx.boardId).set({ scene, updatedAt: now }, { merge: true })
+        await writeBoardScene(db, ctx.boardId, scene, now)
       } catch {
         // ignore write errors; still broadcast best-effort
       }
 
-      broadcast(ctx.boardId, { type: "scene:update", scene, from: ctx.uid, ts: now }, ws)
+      // Avoid broadcasting very large scenes; persistence still happens via chunking/HTTP.
+      if (jsonSize <= SCENE_INLINE_LIMIT_BYTES) {
+        broadcast(ctx.boardId, { type: "scene:update", scene, from: ctx.uid, ts: now }, ws)
+      }
     }
   })
 })
 
 const port = Number(process.env.PORT || 3001)
-await app.listen({ port, host: "0.0.0.0" })
+const host = process.env.HOST || (process.env.NODE_ENV === "production" ? "0.0.0.0" : "127.0.0.1")
+await app.listen({ port, host })
 
