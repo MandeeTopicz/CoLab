@@ -545,11 +545,16 @@ app.patch("/api/boards/:boardId", { preHandler: requireAuth }, async (req: any, 
   const boardId = String(req.params.boardId || "")
   if (!boardId) return reply.status(400).send({ ok: false, error: "bad_request", message: "boardId required" })
 
-  let body: { onboardingDismissedAt: number }
+  let body: { onboardingDismissedAt?: number; name?: string }
   try {
-    body = z.object({ onboardingDismissedAt: z.number().int().positive() }).parse(req.body ?? {})
+    body = z
+      .object({
+        onboardingDismissedAt: z.number().int().positive().optional(),
+        name: z.string().min(1).max(200).optional(),
+      })
+      .parse(req.body ?? {})
   } catch {
-    return reply.status(400).send({ ok: false, error: "bad_request", message: "onboardingDismissedAt required" })
+    return reply.status(400).send({ ok: false, error: "bad_request", message: "Invalid body" })
   }
 
   const { board, allowed } = await getBoardAndAssertAccess({ boardId, uid: user.uid })
@@ -557,10 +562,10 @@ app.patch("/api/boards/:boardId", { preHandler: requireAuth }, async (req: any, 
   if (!allowed) return reply.forbidden()
 
   const now = Date.now()
-  await getDb()
-    .collection("boards")
-    .doc(boardId)
-    .set({ onboardingDismissedAt: body.onboardingDismissedAt, updatedAt: now }, { merge: true })
+  const update: Record<string, unknown> = { updatedAt: now }
+  if (typeof body.onboardingDismissedAt === "number") update.onboardingDismissedAt = body.onboardingDismissedAt
+  if (typeof body.name === "string" && body.name.trim()) update.name = body.name.trim()
+  await getDb().collection("boards").doc(boardId).set(update, { merge: true })
 
   return { ok: true }
 })

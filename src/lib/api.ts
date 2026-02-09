@@ -90,6 +90,12 @@ export function useApi() {
         }
         return (await res.json()) as { ok: true }
       },
+      updateBoard: (boardId: string, body: { name?: string }) =>
+        request<{ ok: true }>(`/api/boards/${boardId}`, {
+          method: "PATCH",
+          headers,
+          body: JSON.stringify(body),
+        }),
       duplicateBoard: (boardId: string, body: { name: string; workspaceId?: string; scene?: any }) =>
         request<{ boardId: string }>(`/api/boards/${boardId}/duplicate`, {
           method: "POST",

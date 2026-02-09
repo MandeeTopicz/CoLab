@@ -52,72 +52,6 @@ function toColorInputValue(value: unknown, fallback: string) {
 const ICON_CLASS = "h-6 w-6"
 const ICON_CLASS_LG = "h-7 w-7"
 
-function AiSparklesIcon() {
-  return (
-    <svg viewBox="0 0 24 24" className={ICON_CLASS} aria-hidden>
-      <path
-        d="M12 3l1.2 3.6L17 8l-3.8 1.4L12 13l-1.2-3.6L7 8l3.8-1.4L12 3z"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinejoin="round"
-      />
-      <path
-        d="M18 12l.8 2.4L21 15l-2.2.6L18 18l-.8-2.4L15 15l2.2-.6L18 12z"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinejoin="round"
-      />
-      <path
-        d="M5.5 13l.6 1.8 1.9.5-1.9.5-.6 1.8-.6-1.8-1.9-.5 1.9-.5.6-1.8z"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinejoin="round"
-      />
-    </svg>
-  )
-}
-
-function ShareIcon() {
-  return (
-    <svg viewBox="0 0 24 24" className={ICON_CLASS} aria-hidden>
-      <path
-        d="M15 8a3 3 0 10-2.8-4H12a3 3 0 003 3z"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <path
-        d="M6.5 14.5l10.2-5.2M6.5 9.5l10.2 5.2"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-      />
-      <path
-        d="M18 21a3 3 0 10-2.8-4H15a3 3 0 003 3z"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <path
-        d="M6 12a3 3 0 10-2.8-4H3a3 3 0 003 3z"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  )
-}
-
 function SaveIcon() {
   return (
     <svg viewBox="0 0 24 24" className={ICON_CLASS} aria-hidden>
@@ -210,46 +144,6 @@ function AlignIcon({
   )
 }
 
-function CursorIcon() {
-  return (
-    <svg viewBox="0 0 24 24" className={ICON_CLASS} aria-hidden>
-      <path
-        d="M4 3l7.4 17.2 2-6 6-2L4 3z"
-        fill="#ffffff"
-        stroke="#0f172a"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  )
-}
-
-function TextBoxIcon() {
-  return (
-    <svg viewBox="0 0 24 24" className={ICON_CLASS} aria-hidden>
-      <rect
-        x="4"
-        y="4"
-        width="16"
-        height="16"
-        rx="3"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinejoin="round"
-      />
-      <path
-        d="M8.5 8.5h7M12 8.5v10"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-      />
-    </svg>
-  )
-}
-
 function HighlighterIcon() {
   return (
     <svg viewBox="0 0 24 24" className={ICON_CLASS} aria-hidden>
@@ -279,32 +173,6 @@ function PencilEraserIcon() {
       <path d="M9 21h10" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
       <path d="M14 9l5 5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
       <path d="M6 16l3 3" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-    </svg>
-  )
-}
-
-function ShapesIcon() {
-  return (
-    <svg viewBox="0 0 24 24" className={ICON_CLASS} aria-hidden>
-      <rect
-        x="3.5"
-        y="13.5"
-        width="7"
-        height="7"
-        rx="1.5"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-      />
-      <circle cx="17.5" cy="17.5" r="3.5" fill="none" stroke="currentColor" strokeWidth="2" />
-      <path
-        d="M12 4l5 8H7l5-8z"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
     </svg>
   )
 }
@@ -447,6 +315,7 @@ function makeTextElement(opts: {
   const fontSize = opts.fontSize ?? 20
   return {
     ...base,
+    locked: false,
     text: opts.text,
     originalText: opts.text,
     fontSize,
@@ -458,6 +327,115 @@ function makeTextElement(opts: {
     containerId: null,
     autoResize: opts.autoResize !== false,
   }
+}
+
+/** Arrow or line element (no binding). Points from (x1,y1) to (x2,y2). */
+function makeArrowLine(
+  kind: "arrow" | "line",
+  x1: number,
+  y1: number,
+  x2: number,
+  y2: number,
+  opts?: { strokeColor?: string; strokeStyle?: "solid" | "dashed"; strokeWidth?: number }
+) {
+  const dx = x2 - x1
+  const dy = y2 - y1
+  const now = Date.now()
+  return {
+    id: randId(),
+    type: kind,
+    x: x1,
+    y: y1,
+    width: dx,
+    height: dy,
+    angle: 0,
+    strokeColor: opts?.strokeColor ?? "#1f2937",
+    backgroundColor: "transparent",
+    fillStyle: "solid",
+    strokeWidth: opts?.strokeWidth ?? 2,
+    strokeStyle: opts?.strokeStyle ?? "solid",
+    roughness: 1,
+    opacity: 100,
+    points: [[0, 0], [dx, dy]],
+    lastCommittedPoint: null,
+    startArrowhead: kind === "arrow" ? "arrow" : null,
+    endArrowhead: kind === "arrow" ? "arrow" : null,
+    groupIds: [],
+    frameId: null,
+    roundness: null,
+    seed: randInt31(),
+    version: 1,
+    versionNonce: randInt31(),
+    isDeleted: false,
+    boundElements: null,
+    updated: now,
+    link: null,
+    locked: false,
+  }
+}
+
+/** Sticky note: rounded rect + empty text. Returns two elements. */
+function makeStickyNote(
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  backgroundColor: string,
+  pad = 12
+): any[] {
+  const rect = makeBaseElement("rectangle", {
+    x,
+    y,
+    width: w,
+    height: h,
+    backgroundColor,
+    strokeColor: "#e5e7eb",
+    strokeWidth: 1,
+    roundness: { type: 3 },
+  })
+  const textEl = makeTextElement({
+    x: x + pad,
+    y: y + pad,
+    width: w - pad * 2,
+    height: h - pad * 2,
+    text: "",
+    fontSize: 16,
+    backgroundColor: "transparent",
+  })
+  return [rect, textEl]
+}
+
+/** Image placeholder: dashed rect, neutral fill (no text). */
+function makeImagePlaceholder(x: number, y: number, w: number, h: number) {
+  return makeBaseElement("rectangle", {
+    x,
+    y,
+    width: w,
+    height: h,
+    strokeColor: "#9ca3af",
+    backgroundColor: "#f3f4f6",
+    strokeWidth: 1,
+    strokeStyle: "dashed",
+  })
+}
+
+/** Section/frame: light background fill for areas. */
+function makeSection(
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  opts?: { backgroundColor?: string; strokeColor?: string }
+) {
+  return makeBaseElement("rectangle", {
+    x,
+    y,
+    width: w,
+    height: h,
+    backgroundColor: opts?.backgroundColor ?? "#f8fafc",
+    strokeColor: opts?.strokeColor ?? "#e2e8f0",
+    strokeWidth: 1,
+  })
 }
 
 /** Stable hash of string to number for layout variant selection (no randomness). */
@@ -475,6 +453,797 @@ function inferTemplateKind(prompt: string): "retro" | "kanban" | "brainstorm" | 
   if (/(diagram|architecture|sequence|flow|system design|technical spec|uml)/.test(p)) return "diagram"
   if (/(sprint|planning|standup|meeting|workshop|kickoff|project|agenda|goals?|scope)/.test(p)) return "kickoff"
   return "kickoff"
+}
+
+const TEMPLATE_CATEGORIES = [
+  "Meetings & Workshops",
+  "Ideation & Brainstorming",
+  "Research & Design",
+  "Agile Workflows",
+  "Strategy & Planning",
+  "Diagramming & Mapping",
+  "Presentations & Slides",
+  "Wireframing & Prototyping",
+  "Image Creation",
+] as const
+
+const TEMPLATES_BY_CATEGORY: Record<string, Array<{ id: string; title: string; previewKind: string }>> = {
+  "Meetings & Workshops": [
+    { id: "project-review", title: "Project Review", previewKind: "blocks-3" },
+    { id: "weekly-okr", title: "Workshop: Weekly OKR Meeting", previewKind: "kanban" },
+    { id: "icebreaker", title: "Activity: Check-in Icebreaker", previewKind: "grid" },
+    { id: "eisenhower", title: "Activity: Impact/Effort Matrix (Eisenhower)", previewKind: "quad" },
+    { id: "4ls-retro", title: "4 L's Retrospective", previewKind: "blocks-4" },
+    { id: "standup", title: "Daily Standup", previewKind: "timeline" },
+    { id: "planning-poker", title: "Planning Poker", previewKind: "grid" },
+  ],
+  "Ideation & Brainstorming": [
+    { id: "brainstorm-grid", title: "Brainstorm Grid", previewKind: "grid" },
+    { id: "mind-map", title: "Mind Map", previewKind: "radial" },
+    { id: "affinity", title: "Affinity Diagram", previewKind: "blocks-4" },
+    { id: "scamper", title: "SCAMPER", previewKind: "list" },
+    { id: "reverse-brainstorm", title: "Reverse Brainstorm", previewKind: "quad" },
+  ],
+  "Research & Design": [
+    { id: "user-persona", title: "User Persona", previewKind: "blocks-3" },
+    { id: "empathy-map", title: "Empathy Map", previewKind: "quad" },
+    { id: "journey-map", title: "Journey Map", previewKind: "timeline" },
+    { id: "swot", title: "SWOT Analysis", previewKind: "quad" },
+  ],
+  "Agile Workflows": [
+    { id: "kanban-board", title: "Kanban Board", previewKind: "kanban" },
+    { id: "sprint-backlog", title: "Sprint Backlog", previewKind: "list" },
+    { id: "retro-board", title: "Retro Board", previewKind: "blocks-3" },
+    { id: "story-map", title: "User Story Map", previewKind: "grid" },
+  ],
+  "Strategy & Planning": [
+    { id: "okr", title: "OKR Board", previewKind: "blocks-3" },
+    { id: "roadmap", title: "Roadmap", previewKind: "timeline" },
+    { id: "goals", title: "Goals & Metrics", previewKind: "quad" },
+  ],
+  "Diagramming & Mapping": [
+    { id: "flowchart", title: "Flow Chart", previewKind: "flow" },
+    { id: "org-chart", title: "Org Chart", previewKind: "tree" },
+    { id: "venn", title: "Venn Diagram", previewKind: "circles" },
+  ],
+  "Presentations & Slides": [
+    { id: "slide-deck", title: "Slide Deck", previewKind: "slides" },
+    { id: "pitch", title: "Pitch Outline", previewKind: "list" },
+  ],
+  "Wireframing & Prototyping": [
+    { id: "wireframe", title: "Wireframe", previewKind: "blocks-3" },
+    { id: "mockup", title: "Mockup Layout", previewKind: "grid" },
+  ],
+  "Image Creation": [
+    { id: "moodboard", title: "Moodboard", previewKind: "grid" },
+    { id: "reference", title: "Reference Board", previewKind: "grid" },
+  ],
+}
+
+const G = 16
+const GRID = 8
+const STICKY_W = 140
+const STICKY_H = 120
+const SECTION_COLORS = { warm: "#fef3c7", blue: "#dbeafe", green: "#d1fae5", purple: "#e9d5ff", pink: "#fce7f3", indigo: "#e0e7ff" }
+const STICKY_COLORS = ["#fef08a", "#bfdbfe", "#bbf7d0", "#fbcfe8", "#e9d5ff"]
+
+function snap(n: number): number {
+  return Math.round(n / GRID) * GRID
+}
+
+function buildComposedTemplate(id: string): any[] {
+  const el = (x: number, y: number, w: number, h: number, opts?: Partial<{ backgroundColor: string; strokeColor: string; strokeStyle: "solid" | "dashed" }>) =>
+    makeBaseElement("rectangle", { x: snap(x), y: snap(y), width: w, height: h, ...opts })
+  const section = (x: number, y: number, w: number, h: number, bg?: string) =>
+    makeSection(snap(x), snap(y), w, h, { backgroundColor: bg ?? SECTION_COLORS.warm })
+  const sticky = (x: number, y: number, color: string) => makeStickyNote(snap(x), snap(y), STICKY_W, STICKY_H, color).flat()
+  const img = (x: number, y: number, w: number, h: number) => makeImagePlaceholder(snap(x), snap(y), w, h)
+  const arrow = (x1: number, y1: number, x2: number, y2: number, dashed?: boolean) =>
+    makeArrowLine("arrow", snap(x1), snap(y1), snap(x2), snap(y2), { strokeStyle: dashed ? "dashed" : "solid" })
+  const line = (x1: number, y1: number, x2: number, y2: number) => makeArrowLine("line", snap(x1), snap(y1), snap(x2), snap(y2))
+
+  const elements: any[] = []
+
+  switch (id) {
+    case "project-review": {
+      const h = 180
+      const headH = 56
+      const pad = G
+      const contentWidth = 3 * STICKY_W + 2 * G
+      const sectionW = contentWidth + pad * 2
+      const contentTop = -h + headH + pad
+      elements.push(section(-sectionW / 2, -h - pad, sectionW, headH), section(-sectionW / 2, contentTop, sectionW, h - headH - pad + 20))
+      for (let r = 0; r < 2; r++) for (let c = 0; c < 3; c++) elements.push(...sticky(-sectionW / 2 + pad + c * (STICKY_W + G), contentTop + pad + r * (STICKY_H + G), STICKY_COLORS[c % STICKY_COLORS.length]))
+      break
+    }
+    case "weekly-okr": {
+      const colW = 200
+      const headH = 44
+      for (let col = 0; col < 3; col++) {
+        const cx = -300 + col * (colW + G)
+        elements.push(section(cx, -120, colW, headH, SECTION_COLORS.blue))
+        for (let r = 0; r < 3; r++) elements.push(...sticky(cx + 8, -120 + headH + G + r * (STICKY_H + 8), STICKY_COLORS[r % STICKY_COLORS.length]))
+      }
+      elements.push(arrow(-300 + colW, -98, -300 + colW + G, -98), arrow(-100 + colW, -98, -100 + colW + G, -98))
+      break
+    }
+    case "icebreaker": {
+      const cellW = 100
+      const cellH = 72
+      for (let r = 0; r < 3; r++) for (let c = 0; c < 4; c++) elements.push(...sticky(-200 + c * (cellW + G), -100 + r * (cellH + G), STICKY_COLORS[(r + c) % STICKY_COLORS.length]))
+      break
+    }
+    case "eisenhower": {
+      const q = 180
+      const gap = 12
+      elements.push(section(-q - gap, -q - gap, q, q, "#fef3c7"), section(gap, -q - gap, q, q, "#dbeafe"), section(-q - gap, gap, q, q, "#d1fae5"), section(gap, gap, q, q, "#e9d5ff"))
+      for (let i = 0; i < 2; i++) for (let j = 0; j < 2; j++) elements.push(...sticky(-q - gap + 20 + j * (q + gap) + 16, -q - gap + 24 + i * (q + gap) + 16, STICKY_COLORS[(i * 2 + j) % STICKY_COLORS.length]))
+      elements.push(arrow(-gap, 0, gap, 0), arrow(0, -gap, 0, gap))
+      break
+    }
+    case "4ls-retro": {
+      const colW = 200
+      const labels = [SECTION_COLORS.warm, SECTION_COLORS.blue, SECTION_COLORS.green, SECTION_COLORS.purple]
+      for (let col = 0; col < 4; col++) {
+        const cx = -400 + col * (colW + G)
+        elements.push(section(cx, -140, colW, 40, labels[col]))
+        for (let r = 0; r < 2; r++) elements.push(...sticky(cx + 8, -96 + r * (STICKY_H + 8), STICKY_COLORS[col % STICKY_COLORS.length]))
+      }
+      break
+    }
+    case "standup": {
+      const stepW = 160
+      const boxW = 120
+      const boxH = 64
+      for (let i = 0; i < 4; i++) {
+        const x = -280 + i * (stepW + G)
+        elements.push(section(x, -40, boxW, boxH, SECTION_COLORS.blue))
+        if (i < 3) elements.push(arrow(x + boxW, -8, x + boxW + G, -8))
+      }
+      elements.push(line(-320, 0, 320, 0))
+      break
+    }
+    case "planning-poker": {
+      const cardW = 72
+      const cardH = 100
+      for (let r = 0; r < 2; r++) for (let c = 0; c < 5; c++) elements.push(el(-200 + c * (cardW + G), -60 + r * (cardH + G), cardW, cardH, { backgroundColor: STICKY_COLORS[c % STICKY_COLORS.length], strokeColor: "#e5e7eb" }))
+      elements.push(section(-220, -180, 440, 48, SECTION_COLORS.purple))
+      break
+    }
+    case "brainstorm-grid": {
+      const pad = G
+      const totalW = 4 * STICKY_W + 3 * pad
+      const totalH = 3 * STICKY_H + 2 * pad
+      const left = -totalW / 2
+      const top = -totalH / 2
+      for (let r = 0; r < 3; r++) for (let c = 0; c < 4; c++) elements.push(...sticky(left + c * (STICKY_W + pad), top + r * (STICKY_H + pad), STICKY_COLORS[(r + c) % STICKY_COLORS.length]))
+      break
+    }
+    case "mind-map": {
+      const centerW = 100
+      const centerH = 60
+      elements.push(el(-centerW / 2, -centerH / 2, centerW, centerH, { backgroundColor: SECTION_COLORS.indigo }))
+      const branches = [
+        [-140, -80, -200, -120],
+        [-140, 0, -200, 0],
+        [-140, 80, -200, 120],
+        [140, -80, 200, -120],
+        [140, 0, 200, 0],
+        [140, 80, 200, 120],
+      ]
+      branches.forEach(([x1, y1, x2, y2]) => {
+        elements.push(arrow(x1, y1, x2, y2))
+        elements.push(...sticky(x2 - STICKY_W / 2, y2 - STICKY_H / 2, STICKY_COLORS[Math.abs(x2) % STICKY_COLORS.length]))
+      })
+      break
+    }
+    case "affinity": {
+      const zoneW = 220
+      const zoneH = 160
+      for (let r = 0; r < 2; r++) for (let c = 0; c < 2; c++) {
+        const bx = -250 + c * (zoneW + G)
+        const by = -180 + r * (zoneH + G)
+        elements.push(section(bx, by, zoneW, zoneH, [SECTION_COLORS.warm, SECTION_COLORS.blue, SECTION_COLORS.green, SECTION_COLORS.purple][r * 2 + c]))
+        elements.push(...sticky(bx + 12, by + 12, STICKY_COLORS[(r + c) % STICKY_COLORS.length]))
+        elements.push(...sticky(bx + 12 + STICKY_W + 8, by + 12, STICKY_COLORS[(r + c + 1) % STICKY_COLORS.length]))
+      }
+      break
+    }
+    case "scamper": {
+      const colW = 140
+      for (let col = 0; col < 5; col++) {
+        const cx = -360 + col * (colW + G)
+        elements.push(section(cx, -140, colW, 36, SECTION_COLORS.blue))
+        elements.push(...sticky(cx + 8, -96, STICKY_COLORS[col % STICKY_COLORS.length]))
+        if (col < 4) elements.push(arrow(cx + colW, -122, cx + colW + G, -122))
+      }
+      break
+    }
+    case "reverse-brainstorm": {
+      const q = 160
+      elements.push(section(-q - G, -q - G, q, q, "#fef3c7"), section(G, -q - G, q, q, "#dbeafe"), section(-q - G, G, q, q, "#d1fae5"), section(G, G, q, q, "#e9d5ff"))
+      for (let i = 0; i < 2; i++) for (let j = 0; j < 2; j++) elements.push(...sticky(-q - G + 16 + j * (q + G) + 12, -q - G + 16 + i * (q + G) + 12, STICKY_COLORS[(i * 2 + j) % STICKY_COLORS.length]))
+      break
+    }
+    case "empathy-map": {
+      const w = 140
+      const h = 100
+      elements.push(section(-w - G, -h - G, w * 2 + G * 2, 40, SECTION_COLORS.purple))
+      elements.push(section(-w - G, -h - G, w, h, "#fef3c7"), section(G, -h - G, w, h, "#dbeafe"), section(-w - G, G, w, h, "#d1fae5"), section(G, G, w, h, "#e9d5ff"))
+      elements.push(...sticky(-w - G + 12, -h - G + 48, STICKY_COLORS[0]), ...sticky(G + 12, -h - G + 48, STICKY_COLORS[1]), ...sticky(-w - G + 12, G + 12, STICKY_COLORS[2]), ...sticky(G + 12, G + 12, STICKY_COLORS[3]))
+      break
+    }
+    case "user-persona": {
+      const personaImgW = 120
+      const personaImgH = 140
+      const personaHeaderH = 44
+      const blockW = 240
+      const blockH = 72
+      const topY = -140
+      elements.push(img(-personaImgW - G, topY, personaImgW, personaImgH))
+      elements.push(section(personaImgW + G, topY, 380, personaHeaderH, SECTION_COLORS.blue))
+      const blockTop = topY + personaHeaderH + G
+      for (let i = 0; i < 4; i++) elements.push(section(-blockW - G / 2 + (i % 2) * (blockW + G), blockTop + Math.floor(i / 2) * (blockH + G), blockW, blockH, SECTION_COLORS.warm))
+      break
+    }
+    case "journey-map": {
+      const stageW = 140
+      const stageH = 80
+      for (let i = 0; i < 4; i++) {
+        const x = -280 + i * (stageW + G)
+        elements.push(section(x, -60, stageW, stageH, SECTION_COLORS.blue))
+        if (i < 3) elements.push(arrow(x + stageW, -20, x + stageW + G, -20))
+      }
+      elements.push(line(-320, 20, 320, 20))
+      elements.push(...sticky(-260, 40, STICKY_COLORS[0]), ...sticky(-100, 40, STICKY_COLORS[1]), ...sticky(60, 40, STICKY_COLORS[2]), ...sticky(220, 40, STICKY_COLORS[3]))
+      break
+    }
+    case "swot": {
+      const q = 160
+      const g = 12
+      const colors = [SECTION_COLORS.green, SECTION_COLORS.blue, SECTION_COLORS.warm, SECTION_COLORS.purple]
+      for (let r = 0; r < 2; r++) for (let c = 0; c < 2; c++) elements.push(section(-q - g + c * (q + g), -q - g + r * (q + g), q, q, colors[r * 2 + c]))
+      for (let r = 0; r < 2; r++) for (let c = 0; c < 2; c++) elements.push(...sticky(-q - g + c * (q + g) + 16, -q - g + r * (q + g) + 16, STICKY_COLORS[(r * 2 + c) % STICKY_COLORS.length]))
+      break
+    }
+    case "kanban-board": {
+      const colW = 180
+      const headH = 40
+      for (let col = 0; col < 4; col++) {
+        const cx = -300 + col * (colW + G)
+        elements.push(section(cx, -120, colW, headH, SECTION_COLORS.blue))
+        for (let r = 0; r < 3; r++) elements.push(el(cx + 8, -120 + headH + G + r * 52, colW - 16, 44, { backgroundColor: "#fff", strokeColor: "#e2e8f0" }))
+        if (col < 3) elements.push(arrow(cx + colW, -100, cx + colW + G, -100))
+      }
+      break
+    }
+    case "sprint-backlog": {
+      elements.push(section(-280, -180, 560, 48, SECTION_COLORS.blue))
+      for (let i = 0; i < 6; i++) elements.push(el(-260 + (i % 2) * 260, -120 + Math.floor(i / 2) * 56, 240, 48, { backgroundColor: "#fff", strokeColor: "#e2e8f0" }))
+      for (let i = 0; i < 3; i++) elements.push(arrow(-20, -120 + i * 56, 20, -120 + i * 56, true))
+      break
+    }
+    case "retro-board": {
+      const colW = 200
+      const labels = [SECTION_COLORS.warm, SECTION_COLORS.blue, SECTION_COLORS.green]
+      for (let col = 0; col < 3; col++) {
+        const cx = -320 + col * (colW + G)
+        elements.push(section(cx, -140, colW, 44, labels[col]))
+        for (let r = 0; r < 2; r++) elements.push(...sticky(cx + 8, -88 + r * (STICKY_H + 8), STICKY_COLORS[col % STICKY_COLORS.length]))
+      }
+      break
+    }
+    case "story-map": {
+      const rowH = 120
+      const rowGap = G
+      elements.push(section(-320, -200, 640, 40, SECTION_COLORS.purple))
+      for (let r = 0; r < 3; r++) {
+        const rowTop = -152 + r * (rowH + rowGap)
+        elements.push(section(-320, rowTop, 640, rowH, r === 0 ? SECTION_COLORS.blue : "#f8fafc"))
+        for (let c = 0; c < 5; c++) elements.push(...sticky(-280 + c * (STICKY_W + 8), rowTop + 12, STICKY_COLORS[(r + c) % STICKY_COLORS.length]))
+      }
+      break
+    }
+    case "okr": {
+      elements.push(section(-320, -160, 640, 52, SECTION_COLORS.indigo))
+      elements.push(section(-320, -96, 300, 120, SECTION_COLORS.blue))
+      elements.push(section(20, -96, 300, 120, SECTION_COLORS.green))
+      elements.push(...sticky(-300, -76, STICKY_COLORS[0]), ...sticky(-300, 20, STICKY_COLORS[1]), ...sticky(40, -76, STICKY_COLORS[2]))
+      break
+    }
+    case "roadmap": {
+      const phaseW = 160
+      for (let i = 0; i < 4; i++) {
+        const x = -300 + i * (phaseW + G)
+        elements.push(section(x, -50, phaseW, 60, SECTION_COLORS.blue))
+        if (i < 3) elements.push(arrow(x + phaseW, -20, x + phaseW + G, -20))
+      }
+      elements.push(line(-320, 30, 320, 30))
+      elements.push(...sticky(-260, 50, STICKY_COLORS[0]), ...sticky(-80, 50, STICKY_COLORS[1]), ...sticky(100, 50, STICKY_COLORS[2]), ...sticky(236, 50, STICKY_COLORS[3]))
+      break
+    }
+    case "goals": {
+      elements.push(section(-300, -140, 280, 100, SECTION_COLORS.blue))
+      elements.push(section(20, -140, 280, 100, SECTION_COLORS.green))
+      elements.push(...sticky(-280, -120, STICKY_COLORS[0]), ...sticky(-280, 20, STICKY_COLORS[1]), ...sticky(40, -120, STICKY_COLORS[2]))
+      elements.push(arrow(-20, -90, 20, -90))
+      break
+    }
+    case "flowchart": {
+      const boxW = 100
+      const boxH = 44
+      const nodes = [[-120, -60], [-120, 0], [-120, 60], [80, 0]]
+      nodes.forEach(([x, y]) => elements.push(el(x - boxW / 2, y - boxH / 2, boxW, boxH, { backgroundColor: SECTION_COLORS.blue })))
+      elements.push(arrow(-70, -60, -70, -8), arrow(-70, 8, -70, 60), arrow(-20, 0, 30, 0))
+      break
+    }
+    case "org-chart": {
+      const boxW = 90
+      const boxH = 40
+      elements.push(el(-boxW / 2, -80, boxW, boxH, { backgroundColor: SECTION_COLORS.indigo }))
+      elements.push(el(-120, 20, boxW, boxH, { backgroundColor: SECTION_COLORS.blue }))
+      elements.push(el(30, 20, boxW, boxH, { backgroundColor: SECTION_COLORS.blue }))
+      elements.push(arrow(0, -40, -45, 0), arrow(0, -40, 45, 0))
+      break
+    }
+    case "venn": {
+      const r = 70
+      elements.push(makeBaseElement("ellipse", { x: -r - 30, y: -r / 2, width: r * 2, height: r * 2, backgroundColor: "#dbeafe", strokeColor: "#1e40af", opacity: 80 }))
+      elements.push(makeBaseElement("ellipse", { x: -20, y: -r / 2, width: r * 2, height: r * 2, backgroundColor: "#d1fae5", strokeColor: "#047857", opacity: 80 }))
+      elements.push(makeBaseElement("ellipse", { x: 30, y: -r / 2, width: r * 2, height: r * 2, backgroundColor: "#fef3c7", strokeColor: "#b45309", opacity: 80 }))
+      break
+    }
+    case "slide-deck": {
+      const slideW = 160
+      const slideH = 100
+      for (let i = 0; i < 3; i++) elements.push(section(-260 + i * (slideW + G), -60, slideW, slideH, "#fff"))
+      for (let i = 0; i < 3; i++) elements.push(img(-250 + i * (slideW + G), -50, 140, 60))
+      elements.push(arrow(-100, 50, -100 + G, 50))
+      break
+    }
+    case "pitch": {
+      elements.push(section(-280, -160, 560, 44, SECTION_COLORS.purple))
+      for (let i = 0; i < 4; i++) elements.push(section(-260, -100 + i * 56, 520, 48, "#f8fafc"))
+      for (let i = 0; i < 3; i++) elements.push(arrow(0, -72 + i * 56, 0, -44 + (i + 1) * 56))
+      break
+    }
+    case "wireframe": {
+      const headerH = 40
+      const contentH = 200
+      const wirePad = G
+      elements.push(el(-240 - wirePad, -120 - wirePad, 200 + wirePad * 2, headerH, { backgroundColor: "#fff", strokeColor: "#e2e8f0" }))
+      elements.push(el(-240 - wirePad, -120 + headerH, 440 + wirePad * 2, contentH, { backgroundColor: "#fff", strokeColor: "#e2e8f0" }))
+      elements.push(img(-220, -40, 160, 120))
+      elements.push(el(-40, -40, 200, 36, { backgroundColor: "#fff", strokeColor: "#e2e8f0" }))
+      break
+    }
+    case "mockup": {
+      const cellW = 160
+      const cellH = 120
+      for (let r = 0; r < 2; r++) for (let c = 0; c < 3; c++) elements.push(img(-260 + c * (cellW + G), -140 + r * (cellH + G), cellW, cellH))
+      elements.push(section(-280, -180, 560, 44, "#f1f5f9"))
+      break
+    }
+    case "moodboard": {
+      const cellW = 140
+      const cellH = 120
+      const totalW = 4 * cellW + 3 * G
+      const totalH = 3 * cellH + 2 * G
+      for (let r = 0; r < 3; r++) for (let c = 0; c < 4; c++) elements.push(img(-totalW / 2 + c * (cellW + G), -totalH / 2 + r * (cellH + G), cellW, cellH))
+      break
+    }
+    case "reference": {
+      const refImgW = 160
+      const refImgH = 120
+      const refGap = G
+      const row1Y = -refImgH - refGap
+      const totalImgW = 3 * refImgW + 2 * refGap
+      const left = -totalImgW / 2
+      elements.push(img(left, row1Y, refImgW, refImgH))
+      elements.push(img(left + refImgW + refGap, row1Y, refImgW, refImgH))
+      elements.push(img(left + 2 * (refImgW + refGap), row1Y, refImgW, refImgH))
+      const stickyY = row1Y + refImgH + refGap
+      elements.push(...sticky(left, stickyY, STICKY_COLORS[0]))
+      elements.push(...sticky(left + refImgW + refGap, stickyY, STICKY_COLORS[1]))
+      break
+    }
+    default:
+      return []
+  }
+  return elements.flat()
+}
+
+function getTemplatesForCategory(category: string): Array<{ id: string; title: string; previewKind: string }> {
+  return TEMPLATES_BY_CATEGORY[category] ?? []
+}
+
+const PREVIEW_COLORS = {
+  warm: "#fef3c7",
+  blue: "#dbeafe",
+  green: "#d1fae5",
+  purple: "#e9d5ff",
+  pink: "#fce7f3",
+  indigo: "#e0e7ff",
+  neutral: "#f8fafc",
+  sticky: ["#fef08a", "#bfdbfe", "#bbf7d0", "#fbcfe8", "#e9d5ff"] as const,
+  imgStroke: "#9ca3af",
+  imgFill: "#f3f4f6",
+}
+
+function TemplatePreviewSvg({ id }: { id: string }) {
+  const w = 160
+  const h = 100
+  const C = PREVIEW_COLORS
+  const s = (i: number) => C.sticky[i % C.sticky.length]
+
+  const content = (() => {
+    switch (id) {
+      case "project-review":
+        return (
+          <>
+            <rect x="0" y="0" width="160" height="22" rx="2" fill={C.warm} stroke="#e2e8f0" strokeWidth="0.5" />
+            <rect x="0" y="26" width="160" height="74" rx="2" fill={C.neutral} stroke="#e2e8f0" strokeWidth="0.5" />
+            {[0, 1].map((r) => [0, 1, 2].map((c) => <rect key={`${r}-${c}`} x={8 + c * 50} y={32 + r * 36} width="44" height="28" rx="3" fill={s(c)} stroke="#e5e7eb" strokeWidth="0.5" />))}
+          </>
+        )
+      case "weekly-okr":
+        return (
+          <>
+            {[0, 1, 2].map((col) => (
+              <g key={col}>
+                <rect x={4 + col * 52} y="4" width="48" height="14" rx="2" fill={C.blue} stroke="#e2e8f0" strokeWidth="0.5" />
+                {[0, 1, 2].map((r) => <rect key={r} x={8 + col * 52} y={22 + r * 24} width="40" height="20" rx="3" fill={s(r)} stroke="#e5e7eb" strokeWidth="0.5" />)}
+              </g>
+            ))}
+            <path d="M 54 11 L 58 11" stroke="#1f2937" strokeWidth="1.2" fill="none" />
+            <path d="M 106 11 L 110 11" stroke="#1f2937" strokeWidth="1.2" fill="none" />
+          </>
+        )
+      case "icebreaker":
+        return (
+          <>
+            {[0, 1, 2].map((r) => [0, 1, 2, 3].map((c) => <rect key={`${r}-${c}`} x={4 + c * 39} y={4 + r * 30} width="34" height="24" rx="3" fill={s(r + c)} stroke="#e5e7eb" strokeWidth="0.5" />))}
+          </>
+        )
+      case "eisenhower":
+        return (
+          <>
+            <rect x="2" y="2" width="76" height="46" rx="2" fill={C.warm} stroke="#e2e8f0" strokeWidth="0.5" />
+            <rect x="80" y="2" width="78" height="46" rx="2" fill={C.blue} stroke="#e2e8f0" strokeWidth="0.5" />
+            <rect x="2" y="50" width="76" height="48" rx="2" fill={C.green} stroke="#e2e8f0" strokeWidth="0.5" />
+            <rect x="80" y="50" width="78" height="48" rx="2" fill={C.purple} stroke="#e2e8f0" strokeWidth="0.5" />
+            {[0, 1].map((i) => [0, 1].map((j) => <rect key={`${i}-${j}`} x={10 + j * 78} y={12 + i * 44} width="32" height="22" rx="3" fill={s(i * 2 + j)} stroke="#e5e7eb" strokeWidth="0.5" />))}
+            <path d="M 78 25 L 82 25" stroke="#1f2937" strokeWidth="1" fill="none" />
+            <path d="M 80 48 L 80 52" stroke="#1f2937" strokeWidth="1" fill="none" />
+          </>
+        )
+      case "4ls-retro":
+        return (
+          <>
+            {[0, 1, 2, 3].map((col) => (
+              <g key={col}>
+                <rect x={2 + col * 40} y="4" width="36" height="12" rx="2" fill={[C.warm, C.blue, C.green, C.purple][col]} stroke="#e2e8f0" strokeWidth="0.5" />
+                <rect x={6 + col * 40} y="20" width="28" height="20" rx="3" fill={s(col)} stroke="#e5e7eb" strokeWidth="0.5" />
+                <rect x={6 + col * 40} y="44" width="28" height="20" rx="3" fill={s(col)} stroke="#e5e7eb" strokeWidth="0.5" />
+              </g>
+            ))}
+          </>
+        )
+      case "standup":
+        return (
+          <>
+            <line x1="8" y1="50" x2="152" y2="50" stroke="#1f2937" strokeWidth="1" opacity="0.6" />
+            {[0, 1, 2, 3].map((i) => (
+              <g key={i}>
+                <rect x={12 + i * 38} y="28" width="32" height="20" rx="2" fill={C.blue} stroke="#e2e8f0" strokeWidth="0.5" />
+                {i < 3 && <path d={`M ${46 + i * 38} 38 L ${50 + i * 38} 38`} stroke="#1f2937" strokeWidth="1" fill="none" />}
+              </g>
+            ))}
+          </>
+        )
+      case "planning-poker":
+        return (
+          <>
+            <rect x="4" y="4" width="152" height="16" rx="2" fill={C.purple} stroke="#e2e8f0" strokeWidth="0.5" />
+            {[0, 1].map((r) => [0, 1, 2, 3, 4].map((c) => <rect key={`${r}-${c}`} x={8 + c * 30} y={26 + r * 32} width="26" height="28" rx="2" fill={s(c)} stroke="#e5e7eb" strokeWidth="0.5" />))}
+          </>
+        )
+      case "brainstorm-grid":
+        return (
+          <>
+            <rect x="2" y="2" width="156" height="96" rx="2" fill={C.neutral} stroke="#e2e8f0" strokeWidth="0.5" />
+            {[0, 1, 2].map((r) => [0, 1, 2, 3].map((c) => <rect key={`${r}-${c}`} x={8 + c * 38} y={8 + r * 28} width="34" height="24" rx="3" fill={s(r + c)} stroke="#e5e7eb" strokeWidth="0.5" />))}
+          </>
+        )
+      case "mind-map":
+        return (
+          <>
+            <rect x="68" y="38" width="24" height="24" rx="2" fill={C.indigo} stroke="#e2e8f0" strokeWidth="0.5" />
+            {[0, 1, 2, 3, 4, 5].map((i) => {
+              const a = (i / 6) * Math.PI * 2 - Math.PI / 2
+              const x2 = 80 + 36 * Math.cos(a)
+              const y2 = 50 + 36 * Math.sin(a)
+              return (
+                <g key={i}>
+                  <line x1="80" y1="50" x2={x2} y2={y2} stroke="#1f2937" strokeWidth="1" fill="none" />
+                  <rect x={x2 - 14} y={y2 - 10} width="28" height="20" rx="3" fill={s(i)} stroke="#e5e7eb" strokeWidth="0.5" />
+                </g>
+              )
+            })}
+          </>
+        )
+      case "affinity":
+        return (
+          <>
+            {[0, 1].map((r) => [0, 1].map((c) => {
+              const x = 4 + c * 78
+              const y = 4 + r * 46
+              const bg = [C.warm, C.blue, C.green, C.purple][r * 2 + c]
+              return (
+                <g key={`${r}-${c}`}>
+                  <rect x={x} y={y} width="76" height="44" rx="2" fill={bg} stroke="#e2e8f0" strokeWidth="0.5" />
+                  <rect x={x + 6} y={y + 6} width="28" height="20" rx="3" fill={s(r + c)} stroke="#e5e7eb" strokeWidth="0.5" />
+                  <rect x={x + 40} y={y + 6} width="28" height="20" rx="3" fill={s(r + c + 1)} stroke="#e5e7eb" strokeWidth="0.5" />
+                </g>
+              )
+            }))}
+          </>
+        )
+      case "scamper":
+        return (
+          <>
+            {[0, 1, 2, 3, 4].map((col) => (
+              <g key={col}>
+                <rect x={4 + col * 31} y="4" width="28" height="10" rx="2" fill={C.blue} stroke="#e2e8f0" strokeWidth="0.5" />
+                <rect x={8 + col * 31} y="18" width="20" height="18" rx="3" fill={s(col)} stroke="#e5e7eb" strokeWidth="0.5" />
+                {col < 4 && <path d={`M ${34 + col * 31} 9 L ${38 + col * 31} 9`} stroke="#1f2937" strokeWidth="0.8" fill="none" />}
+              </g>
+            ))}
+          </>
+        )
+      case "reverse-brainstorm":
+        return (
+          <>
+            <rect x="2" y="2" width="76" height="46" rx="2" fill={C.warm} stroke="#e2e8f0" strokeWidth="0.5" />
+            <rect x="80" y="2" width="78" height="46" rx="2" fill={C.blue} stroke="#e2e8f0" strokeWidth="0.5" />
+            <rect x="2" y="50" width="76" height="48" rx="2" fill={C.green} stroke="#e2e8f0" strokeWidth="0.5" />
+            <rect x="80" y="50" width="78" height="48" rx="2" fill={C.purple} stroke="#e2e8f0" strokeWidth="0.5" />
+            {[0, 1].map((i) => [0, 1].map((j) => <rect key={`${i}-${j}`} x={10 + j * 78} y={12 + i * 44} width="32" height="22" rx="3" fill={s(i * 2 + j)} stroke="#e5e7eb" strokeWidth="0.5" />))}
+          </>
+        )
+      case "user-persona":
+        return (
+          <>
+            <rect x="2" y="2" width="156" height="96" rx="2" fill={C.neutral} stroke="#e2e8f0" strokeWidth="0.5" />
+            <rect x="6" y="8" width="36" height="42" rx="2" stroke={C.imgStroke} strokeWidth="0.8" strokeDasharray="3 2" fill={C.imgFill} />
+            <rect x="48" y="8" width="108" height="14" rx="2" fill={C.blue} stroke="#e2e8f0" strokeWidth="0.5" />
+            {[0, 1, 2, 3].map((i) => <rect key={i} x={6 + (i % 2) * 78} y={28 + Math.floor(i / 2) * 32} width="74" height="26" rx="2" fill={C.warm} stroke="#e2e8f0" strokeWidth="0.5" />)}
+          </>
+        )
+      case "empathy-map":
+        return (
+          <>
+            <rect x="2" y="2" width="156" height="14" rx="2" fill={C.purple} stroke="#e2e8f0" strokeWidth="0.5" />
+            <rect x="2" y="18" width="76" height="38" rx="2" fill={C.warm} stroke="#e2e8f0" strokeWidth="0.5" />
+            <rect x="80" y="18" width="78" height="38" rx="2" fill={C.blue} stroke="#e2e8f0" strokeWidth="0.5" />
+            <rect x="2" y="58" width="76" height="40" rx="2" fill={C.green} stroke="#e2e8f0" strokeWidth="0.5" />
+            <rect x="80" y="58" width="78" height="40" rx="2" fill={C.purple} stroke="#e2e8f0" strokeWidth="0.5" />
+            <rect x="8" y="24" width="28" height="26" rx="3" fill={s(0)} stroke="#e5e7eb" strokeWidth="0.5" />
+            <rect x="86" y="24" width="28" height="26" rx="3" fill={s(1)} stroke="#e5e7eb" strokeWidth="0.5" />
+            <rect x="8" y="64" width="28" height="26" rx="3" fill={s(2)} stroke="#e5e7eb" strokeWidth="0.5" />
+            <rect x="86" y="64" width="28" height="26" rx="3" fill={s(3)} stroke="#e5e7eb" strokeWidth="0.5" />
+          </>
+        )
+      case "journey-map":
+        return (
+          <>
+            <line x1="8" y1="52" x2="152" y2="52" stroke="#1f2937" strokeWidth="0.8" opacity="0.6" />
+            {[0, 1, 2, 3].map((i) => (
+              <g key={i}>
+                <rect x={10 + i * 38} y="28" width="32" height="22" rx="2" fill={C.blue} stroke="#e2e8f0" strokeWidth="0.5" />
+                <rect x={10 + i * 38} y="58" width="32" height="24" rx="3" fill={s(i)} stroke="#e5e7eb" strokeWidth="0.5" />
+                {i < 3 && <path d={`M ${44 + i * 38} 39 L ${48 + i * 38} 39`} stroke="#1f2937" strokeWidth="0.8" fill="none" />}
+              </g>
+            ))}
+          </>
+        )
+      case "swot":
+        return (
+          <>
+            {[0, 1].map((r) => [0, 1].map((c) => {
+              const x = 2 + c * 79
+              const y = 2 + r * 48
+              const bg = [C.green, C.blue, C.warm, C.purple][r * 2 + c]
+              return (
+                <g key={`${r}-${c}`}>
+                  <rect x={x} y={y} width="77" height="46" rx="2" fill={bg} stroke="#e2e8f0" strokeWidth="0.5" />
+                  <rect x={x + 8} y={y + 8} width="28" height="22" rx="3" fill={s(r * 2 + c)} stroke="#e5e7eb" strokeWidth="0.5" />
+                </g>
+              )
+            }))}
+          </>
+        )
+      case "kanban-board":
+        return (
+          <>
+            {[0, 1, 2, 3].map((col) => (
+              <g key={col}>
+                <rect x={4 + col * 39} y="4" width="35" height="12" rx="2" fill={C.blue} stroke="#e2e8f0" strokeWidth="0.5" />
+                {[0, 1, 2].map((r) => <rect key={r} x={8 + col * 39} y={20 + r * 24} width="27" height="20" rx="2" fill="#fff" stroke="#e2e8f0" strokeWidth="0.5" />)}
+                {col < 3 && <path d={`M ${41 + col * 39} 10 L ${45 + col * 39} 10`} stroke="#1f2937" strokeWidth="0.8" fill="none" />}
+              </g>
+            ))}
+          </>
+        )
+      case "sprint-backlog":
+        return (
+          <>
+            <rect x="4" y="4" width="152" height="14" rx="2" fill={C.blue} stroke="#e2e8f0" strokeWidth="0.5" />
+            {[0, 1, 2].map((r) => [0, 1].map((c) => <rect key={`${r}-${c}`} x={8 + c * 76} y={24 + r * 22} width="72" height="18" rx="2" fill="#fff" stroke="#e2e8f0" strokeWidth="0.5" />))}
+            <path d="M 78 35 L 82 35" stroke="#1f2937" strokeWidth="0.6" strokeDasharray="2 2" fill="none" />
+            <path d="M 78 57 L 82 57" stroke="#1f2937" strokeWidth="0.6" strokeDasharray="2 2" fill="none" />
+          </>
+        )
+      case "retro-board":
+        return (
+          <>
+            {[0, 1, 2].map((col) => (
+              <g key={col}>
+                <rect x={4 + col * 52} y="4" width="48" height="14" rx="2" fill={[C.warm, C.blue, C.green][col]} stroke="#e2e8f0" strokeWidth="0.5" />
+                <rect x={8 + col * 52} y="22" width="40" height="24" rx="3" fill={s(col)} stroke="#e5e7eb" strokeWidth="0.5" />
+                <rect x={8 + col * 52} y="50" width="40" height="24" rx="3" fill={s(col)} stroke="#e5e7eb" strokeWidth="0.5" />
+              </g>
+            ))}
+          </>
+        )
+      case "story-map":
+        return (
+          <>
+            <rect x="4" y="4" width="152" height="12" rx="2" fill={C.purple} stroke="#e2e8f0" strokeWidth="0.5" />
+            {[0, 1, 2].map((r) => (
+              <rect key={r} x="4" y={20 + r * 26} width="152" height="24" rx="2" fill={r === 0 ? C.blue : C.neutral} stroke="#e2e8f0" strokeWidth="0.5" />
+            ))}
+            {[0, 1, 2].map((r) => [0, 1, 2, 3, 4].map((c) => <rect key={`${r}-${c}`} x={8 + c * 30} y={24 + r * 26} width="26" height="18" rx="3" fill={s(r + c)} stroke="#e5e7eb" strokeWidth="0.5" />))}
+          </>
+        )
+      case "okr":
+        return (
+          <>
+            <rect x="4" y="4" width="152" height="16" rx="2" fill={C.indigo} stroke="#e2e8f0" strokeWidth="0.5" />
+            <rect x="4" y="24" width="72" height="36" rx="2" fill={C.blue} stroke="#e2e8f0" strokeWidth="0.5" />
+            <rect x="80" y="24" width="76" height="36" rx="2" fill={C.green} stroke="#e2e8f0" strokeWidth="0.5" />
+            <rect x="8" y="28" width="28" height="18" rx="3" fill={s(0)} stroke="#e5e7eb" strokeWidth="0.5" />
+            <rect x="8" y="50" width="28" height="18" rx="3" fill={s(1)} stroke="#e5e7eb" strokeWidth="0.5" />
+            <rect x="84" y="28" width="28" height="18" rx="3" fill={s(2)} stroke="#e5e7eb" strokeWidth="0.5" />
+          </>
+        )
+      case "roadmap":
+        return (
+          <>
+            {[0, 1, 2, 3].map((i) => (
+              <g key={i}>
+                <rect x={8 + i * 40} y="32" width="34" height="24" rx="2" fill={C.blue} stroke="#e2e8f0" strokeWidth="0.5" />
+                <rect x={8 + i * 40} y="62" width="34" height="22" rx="3" fill={s(i)} stroke="#e5e7eb" strokeWidth="0.5" />
+                {i < 3 && <path d={`M ${44 + i * 40} 44 L ${48 + i * 40} 44`} stroke="#1f2937" strokeWidth="0.8" fill="none" />}
+              </g>
+            ))}
+            <line x1="8" y1="72" x2="152" y2="72" stroke="#1f2937" strokeWidth="0.6" opacity="0.5" />
+          </>
+        )
+      case "goals":
+        return (
+          <>
+            <rect x="4" y="4" width="72" height="42" rx="2" fill={C.blue} stroke="#e2e8f0" strokeWidth="0.5" />
+            <rect x="80" y="4" width="76" height="42" rx="2" fill={C.green} stroke="#e2e8f0" strokeWidth="0.5" />
+            <rect x="8" y="8" width="28" height="18" rx="3" fill={s(0)} stroke="#e5e7eb" strokeWidth="0.5" />
+            <rect x="8" y="30" width="28" height="18" rx="3" fill={s(1)} stroke="#e5e7eb" strokeWidth="0.5" />
+            <rect x="84" y="8" width="28" height="18" rx="3" fill={s(2)} stroke="#e5e7eb" strokeWidth="0.5" />
+            <path d="M 76 25 L 80 25" stroke="#1f2937" strokeWidth="0.8" fill="none" />
+          </>
+        )
+      case "flowchart":
+        return (
+          <>
+            <rect x="28" y="18" width="32" height="18" rx="2" fill={C.blue} stroke="#e2e8f0" strokeWidth="0.5" />
+            <rect x="28" y="42" width="32" height="18" rx="2" fill={C.blue} stroke="#e2e8f0" strokeWidth="0.5" />
+            <rect x="28" y="66" width="32" height="18" rx="2" fill={C.blue} stroke="#e2e8f0" strokeWidth="0.5" />
+            <rect x="100" y="42" width="32" height="18" rx="2" fill={C.blue} stroke="#e2e8f0" strokeWidth="0.5" />
+            <path d="M 44 36 L 44 40" stroke="#1f2937" strokeWidth="1" fill="none" />
+            <path d="M 44 60 L 44 64" stroke="#1f2937" strokeWidth="1" fill="none" />
+            <path d="M 60 51 L 98 51" stroke="#1f2937" strokeWidth="1" fill="none" />
+          </>
+        )
+      case "org-chart":
+        return (
+          <>
+            <rect x="68" y="8" width="24" height="16" rx="2" fill={C.indigo} stroke="#e2e8f0" strokeWidth="0.5" />
+            <rect x="24" y="48" width="24" height="16" rx="2" fill={C.blue} stroke="#e2e8f0" strokeWidth="0.5" />
+            <rect x="112" y="48" width="24" height="16" rx="2" fill={C.blue} stroke="#e2e8f0" strokeWidth="0.5" />
+            <line x1="80" y1="24" x2="36" y2="48" stroke="#1f2937" strokeWidth="0.8" />
+            <line x1="80" y1="24" x2="124" y2="48" stroke="#1f2937" strokeWidth="0.8" />
+          </>
+        )
+      case "venn":
+        return (
+          <>
+            <ellipse cx="45" cy="50" rx="28" ry="24" fill={C.blue} opacity="0.85" stroke="#1e40af" strokeWidth="0.6" />
+            <ellipse cx="80" cy="50" rx="28" ry="24" fill={C.green} opacity="0.85" stroke="#047857" strokeWidth="0.6" />
+            <ellipse cx="115" cy="50" rx="28" ry="24" fill={C.warm} opacity="0.85" stroke="#b45309" strokeWidth="0.6" />
+          </>
+        )
+      case "slide-deck":
+        return (
+          <>
+            {[0, 1, 2].map((i) => (
+              <g key={i}>
+                <rect x={12 + i * 48} y="12" width="42" height="32" rx="2" fill="#fff" stroke="#e2e8f0" strokeWidth="0.5" />
+                <rect x={14 + i * 48} y="14" width="38" height="20" rx="1" stroke={C.imgStroke} strokeDasharray="2 2" fill={C.imgFill} strokeWidth="0.5" />
+              </g>
+            ))}
+            <path d="M 80 44 L 84 44" stroke="#1f2937" strokeWidth="0.6" fill="none" />
+          </>
+        )
+      case "pitch":
+        return (
+          <>
+            <rect x="4" y="4" width="152" height="14" rx="2" fill={C.purple} stroke="#e2e8f0" strokeWidth="0.5" />
+            {[0, 1, 2, 3].map((i) => <rect key={i} x="8" y={22 + i * 18} width="144" height="16" rx="2" fill={C.neutral} stroke="#e2e8f0" strokeWidth="0.5" />)}
+            <path d="M 80 31 L 80 36" stroke="#1f2937" strokeWidth="0.5" fill="none" />
+            <path d="M 80 49 L 80 54" stroke="#1f2937" strokeWidth="0.5" fill="none" />
+            <path d="M 80 67 L 80 72" stroke="#1f2937" strokeWidth="0.5" fill="none" />
+          </>
+        )
+      case "wireframe":
+        return (
+          <>
+            <rect x="4" y="4" width="152" height="92" rx="2" fill={C.neutral} stroke="#e2e8f0" strokeWidth="0.5" />
+            <rect x="8" y="8" width="64" height="14" rx="2" fill="#fff" stroke="#e2e8f0" strokeWidth="0.5" />
+            <rect x="8" y="26" width="152" height="64" rx="2" fill="#fff" stroke="#e2e8f0" strokeWidth="0.5" />
+            <rect x="12" y="30" width="48" height="36" rx="1" stroke={C.imgStroke} strokeDasharray="2 2" fill={C.imgFill} strokeWidth="0.5" />
+            <rect x="66" y="30" width="88" height="12" rx="2" fill="#fff" stroke="#e2e8f0" strokeWidth="0.5" />
+          </>
+        )
+      case "mockup":
+        return (
+          <>
+            <rect x="4" y="4" width="152" height="14" rx="2" fill="#f1f5f9" stroke="#e2e8f0" strokeWidth="0.5" />
+            {[0, 1].map((r) => [0, 1, 2].map((c) => <rect key={`${r}-${c}`} x={8 + c * 50} y={22 + r * 36} width="46" height="32" rx="1" stroke={C.imgStroke} strokeDasharray="2 2" fill={C.imgFill} strokeWidth="0.5" />))}
+          </>
+        )
+      case "moodboard":
+        return (
+          <>
+            <rect x="4" y="4" width="152" height="92" rx="2" fill={C.neutral} stroke="#e2e8f0" strokeWidth="0.5" />
+            {[0, 1, 2].map((r) => [0, 1, 2, 3].map((c) => <rect key={`${r}-${c}`} x={8 + c * 38} y={8 + r * 28} width="34" height="24" rx="1" stroke={C.imgStroke} strokeDasharray="2 2" fill={C.imgFill} strokeWidth="0.5" />))}
+          </>
+        )
+      case "reference":
+        return (
+          <>
+            <rect x="4" y="4" width="152" height="92" rx="2" fill={C.neutral} stroke="#e2e8f0" strokeWidth="0.5" />
+            <rect x="8" y="8" width="46" height="38" rx="1" stroke={C.imgStroke} strokeDasharray="2 2" fill={C.imgFill} strokeWidth="0.5" />
+            <rect x="58" y="8" width="46" height="38" rx="1" stroke={C.imgStroke} strokeDasharray="2 2" fill={C.imgFill} strokeWidth="0.5" />
+            <rect x="108" y="8" width="44" height="38" rx="1" stroke={C.imgStroke} strokeDasharray="2 2" fill={C.imgFill} strokeWidth="0.5" />
+            <rect x="8" y="52" width="46" height="24" rx="3" fill={s(0)} stroke="#e5e7eb" strokeWidth="0.5" />
+            <rect x="58" y="52" width="46" height="24" rx="3" fill={s(1)} stroke="#e5e7eb" strokeWidth="0.5" />
+          </>
+        )
+      default:
+        return (
+          <>
+            <rect x="20" y="20" width="120" height="60" rx="2" fill={C.neutral} stroke="#e2e8f0" strokeWidth="0.5" />
+            <rect x="30" y="32" width="40" height="28" rx="3" fill={s(0)} stroke="#e5e7eb" strokeWidth="0.5" />
+            <rect x="90" y="32" width="40" height="28" rx="3" fill={s(1)} stroke="#e5e7eb" strokeWidth="0.5" />
+          </>
+        )
+    }
+  })()
+
+  return (
+    <svg viewBox={`0 0 ${w} ${h}`} className="w-full h-full min-h-0 object-contain" preserveAspectRatio="xMidYMid meet" style={{ display: "block" }}>
+      {content}
+    </svg>
+  )
 }
 
 const GENERIC_TITLES = new Set([
@@ -1068,6 +1837,24 @@ export function BoardPage() {
 
   const apiRef = useRef<any>(null)
   const [shapesOpen, setShapesOpen] = useState(false)
+  const [activeLeftTool, setActiveLeftTool] = useState<string | null>(null)
+  const [pencilSubTool, setPencilSubTool] = useState<"pen" | "highlighter" | "eraser" | "lasso" | null>(null)
+  const secondaryPanelRef = useRef<HTMLDivElement | null>(null)
+  const [templatesModalOpen, setTemplatesModalOpen] = useState(false)
+  const [templatesSearch, setTemplatesSearch] = useState("")
+  const [templatesCategory, setTemplatesCategory] = useState<string>("Meetings & Workshops")
+  const [textFormatBarVisible, setTextFormatBarVisible] = useState(false)
+  const [stickyNoteColor, setStickyNoteColor] = useState<string>("#fef08a")
+  const [commentMarkers, setCommentMarkers] = useState<
+    Array<{ id: string; x: number; y: number; text: string; author: string; replies: Array<{ text: string; author: string }> }>
+  >([])
+  const [activeCommentId, setActiveCommentId] = useState<string | null>(null)
+  const [pendingComment, setPendingComment] = useState<{ x: number; y: number } | null>(null)
+  const [pendingCommentText, setPendingCommentText] = useState("")
+  const [replyDraft, setReplyDraft] = useState("")
+  const threadPopoverRef = useRef<HTMLDivElement | null>(null)
+  const [shapeStyle, setShapeStyle] = useState({ strokeColor: "#1f2937", fillColor: "#ffffff", strokeOpacity: 100, fillOpacity: 100 })
+  const [pencilOptions, setPencilOptions] = useState({ color: "#1f2937", strokeWidth: 2, strokeStyle: "solid" as "solid" | "dashed", opacity: 100 })
   const [selectionInfo, setSelectionInfo] = useState<{
     kind: "none" | "text" | "shape" | "draw" | "image" | "mixed"
     count: number
@@ -1080,6 +1867,8 @@ export function BoardPage() {
   const [freedrawMode, setFreedrawMode] = useState<"pencil" | "highlighter">("pencil")
   const zoomSigRef = useRef<string>("")
   const [zoomValue, setZoomValue] = useState<number>(1)
+  const [scrollX, setScrollX] = useState<number>(0)
+  const [scrollY, setScrollY] = useState<number>(0)
   const [zoomEditing, setZoomEditing] = useState(false)
   const [zoomDraft, setZoomDraft] = useState("")
   const zoomInputRef = useRef<HTMLInputElement | null>(null)
@@ -1095,6 +1884,7 @@ export function BoardPage() {
   const [shareBusy, setShareBusy] = useState(false)
   const [shareError, setShareError] = useState<string | null>(null)
   const [shareNotice, setShareNotice] = useState<string | null>(null)
+  const [shareAllowEdit, setShareAllowEdit] = useState(true)
   const shareEmailRef = useRef<HTMLInputElement | null>(null)
   const [onboardingOpen, setOnboardingOpen] = useState(false)
   const [onboardingPrompt, setOnboardingPrompt] = useState("")
@@ -1150,6 +1940,14 @@ export function BoardPage() {
   const saveTimerRef = useRef<number | null>(null)
   const lastHttpSaveAtRef = useRef<number>(0)
   const [boardMeta, setBoardMeta] = useState<{ name: string; workspaceId: string; ownerId: string } | null>(null)
+  const [presentationMode, setPresentationMode] = useState(false)
+  const presentationRestoreRef = useRef<{ viewBackgroundColor: string; gridModeEnabled: boolean } | null>(null)
+  const [reactionsOpen, setReactionsOpen] = useState(false)
+  const [activityOpen, setActivityOpen] = useState(false)
+  const [profileOpen, setProfileOpen] = useState(false)
+  const [boardNameEditing, setBoardNameEditing] = useState(false)
+  const [boardNameDraft, setBoardNameDraft] = useState("")
+  const boardNameInputRef = useRef<HTMLInputElement | null>(null)
   const [saveBusy, setSaveBusy] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
   const [saveNotice, setSaveNotice] = useState<string | null>(null)
@@ -1503,6 +2301,8 @@ export function BoardPage() {
 
   const iconBtnClass =
     "inline-flex h-10 w-10 items-center justify-center rounded-xl border border-border bg-surface/90 text-sm font-semibold text-text-secondary shadow-sm backdrop-blur hover:bg-toolbar hover:text-text-primary active:translate-y-px transition duration-fast"
+  const leftToolbarIconBtnClass =
+    "inline-flex h-10 w-10 items-center justify-center rounded-xl bg-surface/90 text-sm font-semibold text-text-secondary shadow-sm backdrop-blur hover:bg-toolbar hover:text-text-primary active:translate-y-px transition duration-fast"
   const iconBtnActiveClass = "bg-toolbar text-text-primary"
   const pillBtnClass =
     "inline-flex h-9 items-center justify-center whitespace-nowrap rounded-lg border border-border bg-surface/90 px-3 text-sm font-semibold text-text-secondary shadow-sm backdrop-blur hover:bg-toolbar hover:text-text-primary active:translate-y-px transition duration-fast disabled:cursor-not-allowed disabled:opacity-50"
@@ -1548,6 +2348,223 @@ export function BoardPage() {
     if (api?.setActiveTool) return api.setActiveTool({ type })
     if (type === "text") dispatchKeyDown({ key: "t" })
   }
+
+  const selectLeftTool = useCallback((tool: string | null) => {
+    setActiveLeftTool(tool)
+    setShapesOpen(false)
+    setPencilSubTool(null)
+    if (tool === "formats" || tool === "link" || tool === "pencil" || tool === "shapes") {
+      setTool("selection")
+    } else if (tool === "hand") setTool("hand")
+    else if (tool === "text") setTool("text")
+    else if (tool === "sticky") setTool("selection")
+    else if (tool === "comment") setTool("selection")
+    else if (tool === "shapes") setTool("selection")
+    else if (tool === null) setTool("hand")
+  }, [])
+
+  const insertElementsAtCenter = useCallback((newElements: any[], options?: { selectAndGroup?: boolean }) => {
+    const api = apiRef.current
+    if (!api?.getAppState || !api?.getSceneElements || !api?.updateScene || !newElements.length) return
+    const appState = api.getAppState()
+    const zoom = typeof appState?.zoom?.value === "number" ? appState.zoom.value : 1
+    const width = typeof appState?.width === "number" ? appState.width : window.innerWidth
+    const height = typeof appState?.height === "number" ? appState.height : window.innerHeight
+    const scrollX = typeof appState?.scrollX === "number" ? appState.scrollX : 0
+    const scrollY = typeof appState?.scrollY === "number" ? appState.scrollY : 0
+    const centerX = -scrollX + width / 2 / zoom
+    const centerY = -scrollY + height / 2 / zoom
+    const bbox = getElementsBoundingBox(newElements)
+    const dx = bbox ? centerX - (bbox.minX + bbox.maxX) / 2 : 0
+    const dy = bbox ? centerY - (bbox.minY + bbox.maxY) / 2 : 0
+    const groupId = options?.selectAndGroup ? randId() : null
+    const shifted = newElements.map((el: any) => ({
+      ...el,
+      x: (el.x ?? 0) + dx,
+      y: (el.y ?? 0) + dy,
+      ...(groupId ? { groupIds: [...(el.groupIds || []), groupId] } : {}),
+    }))
+    const existing = api.getSceneElements() ?? []
+    const nextElements = [...existing, ...shifted]
+    const update: { elements: any[]; appState?: any; captureUpdate?: "IMMEDIATELY" } = { elements: nextElements, captureUpdate: "IMMEDIATELY" }
+    if (options?.selectAndGroup && shifted.length > 0) {
+      const selectedIds = shifted.reduce((acc: Record<string, true>, el: any) => {
+        if (el?.id) acc[el.id] = true
+        return acc
+      }, {})
+      update.appState = { ...appState, selectedElementIds: selectedIds }
+      setTool("selection")
+    }
+    api.updateScene(update)
+  }, [])
+
+  const insertFormatsStructure = useCallback((kind: string) => {
+    const cx = 0
+    const cy = 0
+    const el = (x: number, y: number, w: number, h: number, opts?: Partial<{ strokeColor: string; backgroundColor: string; opacity: number }>) =>
+      makeBaseElement("rectangle", { x, y, width: w, height: h, ...opts })
+    const txt = (x: number, y: number, w: number, h: number, text: string) =>
+      makeTextElement({ x, y, width: w, height: h, text })
+    let elements: any[] = []
+    const gap = 12
+    const cardW = 160
+    const cardH = 56
+    if (kind === "Diagram") {
+      elements = [el(cx - 120, cy - 60, 80, 40), el(cx, cy - 60, 80, 40), el(cx + 120, cy - 60, 80, 40), el(cx - 60, cy, 80, 40), el(cx + 60, cy, 80, 40), el(cx, cy + 60, 80, 40)]
+    } else if (kind === "Doc") {
+      elements = [el(cx - 200, cy - 120, 400, 40), el(cx - 200, cy - 60, 400, 200), el(cx - 200, cy + 150, 400, 40)]
+    } else if (kind === "Slides") {
+      for (let i = 0; i < 3; i++) elements.push(el(cx - 180 + i * 140, cy - 50, 120, 90))
+    } else if (kind === "Table") {
+      for (let r = 0; r < 4; r++) for (let c = 0; c < 3; c++) elements.push(el(cx - 120 + c * 90, cy - 80 + r * 44, 80, 36))
+    } else if (kind === "Timeline") {
+      for (let i = 0; i < 5; i++) {
+        elements.push(el(cx - 200 + i * 100, cy - 20, 12, 12))
+        elements.push(el(cx - 200 + i * 100, cy + 10, 70, 40))
+      }
+    } else if (kind === "Kanban") {
+      for (let col = 0; col < 3; col++) {
+        elements.push(el(cx - 180 + col * 140, cy - 100, 120, 28))
+        for (let row = 0; row < 2; row++) elements.push(el(cx - 172 + col * 140, cy - 64 + row * 52, 104, 44))
+      }
+    } else if (kind === "Flow Chart") {
+      elements = [el(cx - 80, cy - 80, 80, 40), el(cx - 80, cy, 80, 40), el(cx - 80, cy + 80, 80, 40), el(cx + 40, cy, 80, 40)]
+    }
+    if (elements.length) {
+      insertElementsAtCenter(elements)
+      selectLeftTool(null)
+    }
+  }, [insertElementsAtCenter])
+
+  const insertTemplateByKey = useCallback((key: string) => {
+    const composed = buildComposedTemplate(key)
+    if (composed.length > 0) {
+      insertElementsAtCenter(composed, { selectAndGroup: true })
+      return
+    }
+    const formatMap: Record<string, string> = {
+      "project-review": "Doc",
+      "weekly-okr": "Kanban",
+      "icebreaker": "Table",
+      "eisenhower": "Flow Chart",
+      "4ls-retro": "Kanban",
+      "standup": "Timeline",
+      "brainstorm-grid": "Table",
+      "mind-map": "Diagram",
+      "affinity": "Kanban",
+      "kanban-board": "Kanban",
+      "sprint-backlog": "Doc",
+      "retro-board": "Kanban",
+      "flowchart": "Flow Chart",
+      "slide-deck": "Slides",
+      "wireframe": "Diagram",
+      "moodboard": "Table",
+    }
+    const format = formatMap[key]
+    if (format) insertFormatsStructure(format)
+    else insertFormatsStructure("Diagram")
+  }, [insertFormatsStructure, insertElementsAtCenter])
+
+  const insertLinkOrEmbed = useCallback((url: string) => {
+    const api = apiRef.current
+    if (!api?.getAppState || !api?.getSceneElements || !api?.updateScene) return
+    const appState = api.getAppState()
+    const zoom = typeof appState?.zoom?.value === "number" ? appState.zoom.value : 1
+    const width = typeof appState?.width === "number" ? appState.width : window.innerWidth
+    const height = typeof appState?.height === "number" ? appState.height : window.innerHeight
+    const scrollX = typeof appState?.scrollX === "number" ? appState.scrollX : 0
+    const scrollY = typeof appState?.scrollY === "number" ? appState.scrollY : 0
+    const centerX = -scrollX + width / 2 / zoom
+    const centerY = -scrollY + height / 2 / zoom
+    const linkEl = makeTextElement({ x: centerX - 100, y: centerY - 16, width: 200, height: 32, text: url })
+    ;(linkEl as any).link = url
+    const existing = api.getSceneElements() ?? []
+    api.updateScene({ elements: [...existing, linkEl], captureUpdate: "IMMEDIATELY" })
+  }, [])
+
+  const insertStickyAtScene = useCallback((sceneX: number, sceneY: number) => {
+    const api = apiRef.current
+    if (!api?.getSceneElements || !api?.updateScene) return
+    const W = 200
+    const H = 180
+    const pad = 12
+    const rect = makeBaseElement("rectangle", {
+      x: sceneX - W / 2,
+      y: sceneY - H / 2,
+      width: W,
+      height: H,
+      backgroundColor: stickyNoteColor,
+      strokeColor: "#e5e7eb",
+      strokeWidth: 1,
+      roundness: { type: 3 },
+    })
+    const textEl = makeTextElement({
+      x: sceneX - W / 2 + pad,
+      y: sceneY - H / 2 + pad,
+      width: W - pad * 2,
+      height: H - pad * 2,
+      text: "",
+      fontSize: 16,
+      backgroundColor: "transparent",
+    })
+    const existing = api.getSceneElements() ?? []
+    api.updateScene({ elements: [...existing, rect, textEl], captureUpdate: "IMMEDIATELY" })
+    selectLeftTool(null)
+  }, [stickyNoteColor])
+
+  const handleCanvasPointerDown = useCallback((e: React.PointerEvent) => {
+    if (activeLeftTool !== "sticky" && activeLeftTool !== "comment") return
+    const target = e.target as HTMLElement
+    if (target.closest("[data-left-toolbar]") || target.closest("[data-secondary-panel]") || target.closest("[data-templates-modal]") || target.closest("[data-comment-ui]")) return
+    const api = apiRef.current
+    if (!api?.getAppState || !containerRef.current) return
+    const rect = containerRef.current.getBoundingClientRect()
+    const vx = e.clientX - rect.left
+    const vy = e.clientY - rect.top
+    const appState = api.getAppState()
+    const zoom = typeof appState?.zoom?.value === "number" ? appState.zoom.value : 1
+    const scrollX = typeof appState?.scrollX === "number" ? appState.scrollX : 0
+    const scrollY = typeof appState?.scrollY === "number" ? appState.scrollY : 0
+    const sceneX = -scrollX + vx / zoom
+    const sceneY = -scrollY + vy / zoom
+    if (activeLeftTool === "sticky") {
+      e.preventDefault()
+      e.stopPropagation()
+      insertStickyAtScene(sceneX, sceneY)
+    }
+    if (activeLeftTool === "comment") {
+      e.preventDefault()
+      e.stopPropagation()
+      if (pendingComment != null) return
+      setPendingComment({ x: sceneX, y: sceneY })
+      setPendingCommentText("")
+    }
+  }, [activeLeftTool, insertStickyAtScene, pendingComment])
+
+  const commentAuthor = authUser?.displayName ?? "You"
+
+  const saveNewComment = useCallback(() => {
+    if (pendingComment == null) return
+    const id = `c-${Date.now()}`
+    setCommentMarkers((m) => [...m, { id, x: pendingComment.x, y: pendingComment.y, text: pendingCommentText.trim(), author: commentAuthor, replies: [] }])
+    setPendingComment(null)
+    setPendingCommentText("")
+    selectLeftTool(null)
+  }, [pendingComment, pendingCommentText, commentAuthor])
+
+  const cancelNewComment = useCallback(() => {
+    setPendingComment(null)
+    setPendingCommentText("")
+    selectLeftTool(null)
+  }, [])
+
+  const saveReply = useCallback(() => {
+    if (activeCommentId == null || !replyDraft.trim()) return
+    setCommentMarkers((prev) =>
+      prev.map((c) => (c.id === activeCommentId ? { ...c, replies: [...c.replies, { text: replyDraft.trim(), author: commentAuthor }] } : c))
+    )
+    setReplyDraft("")
+  }, [activeCommentId, replyDraft, commentAuthor])
 
   const insertImage = () => {
     const api = apiRef.current
@@ -1886,7 +2903,7 @@ export function BoardPage() {
         // ignore
       }
 
-      // Track zoom value for zoom widget.
+      // Track zoom and scroll for zoom widget and comment markers.
       try {
         const nextZoom = typeof appState?.zoom?.value === "number" ? appState.zoom.value : 1
         const sig = String(nextZoom)
@@ -1894,6 +2911,10 @@ export function BoardPage() {
           zoomSigRef.current = sig
           setZoomValue(nextZoom)
         }
+        const nextScrollX = typeof appState?.scrollX === "number" ? appState.scrollX : 0
+        const nextScrollY = typeof appState?.scrollY === "number" ? appState.scrollY : 0
+        setScrollX(nextScrollX)
+        setScrollY(nextScrollY)
       } catch {
         // ignore
       }
@@ -2037,6 +3058,45 @@ export function BoardPage() {
   }, [shapesOpen])
 
   useEffect(() => {
+    if (!activeLeftTool) return
+    const onDown = (e: MouseEvent) => {
+      const el = e.target as HTMLElement | null
+      if (!el) return
+      if (el.closest("[data-left-toolbar]") || el.closest("[data-secondary-panel]") || el.closest("[data-templates-modal]")) return
+      setActiveLeftTool(null)
+      setPencilSubTool(null)
+    }
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setActiveLeftTool(null)
+        setPencilSubTool(null)
+      }
+    }
+    window.addEventListener("pointerdown", onDown)
+    window.addEventListener("keydown", onKey)
+    return () => {
+      window.removeEventListener("pointerdown", onDown)
+      window.removeEventListener("keydown", onKey)
+    }
+  }, [activeLeftTool])
+
+  useEffect(() => {
+    if (activeLeftTool !== "shapes") return
+    const api = apiRef.current
+    if (!api?.getAppState || !api?.updateScene) return
+    const appState = api.getAppState()
+    api.updateScene({
+      appState: {
+        ...appState,
+        currentItemStrokeColor: shapeStyle.strokeColor,
+        currentItemBackgroundColor: shapeStyle.fillColor,
+        currentItemOpacity: shapeStyle.fillOpacity,
+      },
+      captureUpdate: "IMMEDIATELY",
+    })
+  }, [activeLeftTool, shapeStyle.strokeColor, shapeStyle.fillColor, shapeStyle.fillOpacity])
+
+  useEffect(() => {
     if (!topMenuOpen) return
     const onDown = (e: MouseEvent) => {
       const root = containerRef.current
@@ -2074,7 +3134,7 @@ export function BoardPage() {
       // If we're in a drawing tool, first switch back to selection.
       if (api?.setActiveTool) api.setActiveTool({ type: "selection" })
 
-      // Let Excalidraw update selection state from the click.
+      // Let Excalidraw update selection state from the double-click, then enter edit mode.
       window.setTimeout(() => {
         const appState = api.getAppState?.()
         if (!appState) return
@@ -2097,7 +3157,7 @@ export function BoardPage() {
         document.dispatchEvent(
           new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true })
         )
-      }, 0)
+      }, 100)
     }
 
     root.addEventListener("dblclick", onDblClick)
@@ -2140,8 +3200,11 @@ export function BoardPage() {
     return () => window.clearTimeout(t)
   }, [zoomEditing, zoomValue])
 
+  const effectiveGrid = presentationMode ? false : gridModeEnabled
+  const effectiveViewBackground = presentationMode ? "#ffffff" : undefined
+
   return (
-    <div ref={containerRef} style={{ position: "absolute", inset: 0 }}>
+    <div ref={containerRef} style={{ position: "absolute", inset: 0 }} onPointerDown={handleCanvasPointerDown}>
       {/* Hide Excalidraw's built-in toolbars/menus (we render our own). */}
       <style>{`
         .excalidraw .App-toolbar-container,
@@ -2152,744 +3215,375 @@ export function BoardPage() {
         }
       `}</style>
 
-      {/* Top contextual properties bar */}
-      <div className="pointer-events-none absolute left-0 right-0 top-4 z-50 flex justify-center px-4">
-        <div className="pointer-events-auto inline-flex items-center gap-3 rounded-2xl border border-border bg-surface/85 p-2 shadow-md backdrop-blur">
-          {(() => {
-            const hasSelection = selectionInfo.selectedIds.length > 0
-            const isText = selectionInfo.kind === "text"
-            const isDraw = selectionInfo.kind === "draw"
-            const isShape =
-              selectionInfo.kind === "shape" || selectionInfo.kind === "draw" || selectionInfo.kind === "mixed"
-            const isImage = selectionInfo.kind === "image"
-            const isNone = selectionInfo.kind === "none"
-            const isPencilTool = activeToolType === "freedraw" || activeToolType === "eraser"
-
-            // If pencil is selected and nothing is selected, show pencil-only controls.
-            const showTextControls = isText || (isNone && !isPencilTool)
-            const showStyleControls = isShape || (isNone && true)
-            const showImageControls = isImage || (isNone && !isPencilTool)
-
-            const toggle = (key: string) => setTopMenuOpen((v) => (v === key ? null : key))
-
-            return (
-              <div className="flex items-center gap-2" data-topbar-menu-root>
-                {/* TEXT */}
-                {showTextControls && (
-                  <>
-                    <div className="relative" data-topbar-menu-root>
-                      <button
-                        type="button"
-                        className={topIconBtnClass}
-                        aria-label="Text color"
-                        title="Text color"
-                        aria-expanded={topMenuOpen === "textColor"}
-                        onClick={() => toggle("textColor")}
-                      >
-                        <span
-                          aria-hidden
-                          className="h-3.5 w-3.5 rounded-full border border-border"
-                          style={{
-                            backgroundColor: toColorInputValue(
-                              selectionInfo.primary?.type === "text"
-                                ? ((selectionInfo.primary?.strokeColor as string) || defaults.strokeColor)
-                                : defaults.strokeColor,
-                              "#1f2937"
-                            ),
-                          }}
-                        />
-                      </button>
-                      {topMenuOpen === "textColor" && (
-                        <div className={dropdownClass}>
-                          <input
-                            aria-label="Text color"
-                            type="color"
-                            className="h-10 w-12 cursor-pointer rounded-xl border border-border bg-transparent p-1"
-                            value={toColorInputValue(
-                              selectionInfo.primary?.type === "text"
-                                ? ((selectionInfo.primary?.strokeColor as string) || defaults.strokeColor)
-                                : defaults.strokeColor,
-                              "#1f2937"
-                            )}
-                            onChange={(e) => {
-                              if (selectionInfo.primary?.type === "text")
-                                applyToSelection({ strokeColor: e.target.value }, (el) => el?.type === "text")
-                              else updateAppState({ currentItemStrokeColor: e.target.value })
-                            }}
-                          />
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="relative" data-topbar-menu-root>
-                      <button
-                        type="button"
-                        className={topIconBtnClass}
-                        aria-label="Highlight"
-                        title="Highlight"
-                        aria-expanded={topMenuOpen === "textHighlight"}
-                        onClick={() => toggle("textHighlight")}
-                      >
-                        <span
-                          aria-hidden
-                          className="h-3.5 w-3.5 rounded-sm border border-border"
-                          style={{
-                            backgroundColor: toColorInputValue(
-                              selectionInfo.primary?.type === "text"
-                                ? ((selectionInfo.primary?.backgroundColor as string) || defaults.backgroundColor)
-                                : defaults.backgroundColor,
-                              "#ffffff"
-                            ),
-                          }}
-                        />
-                      </button>
-                      {topMenuOpen === "textHighlight" && (
-                        <div className={dropdownClass}>
-                          <input
-                            aria-label="Text highlight color"
-                            type="color"
-                            className="h-10 w-12 cursor-pointer rounded-xl border border-border bg-transparent p-1"
-                            value={toColorInputValue(
-                              selectionInfo.primary?.type === "text"
-                                ? ((selectionInfo.primary?.backgroundColor as string) || defaults.backgroundColor)
-                                : defaults.backgroundColor,
-                              "#ffffff"
-                            )}
-                            onChange={(e) => {
-                              if (selectionInfo.primary?.type === "text")
-                                applyToSelection({ backgroundColor: e.target.value }, (el) => el?.type === "text")
-                              else updateAppState({ currentItemBackgroundColor: e.target.value })
-                            }}
-                          />
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="relative" data-topbar-menu-root>
-                      <button
-                        type="button"
-                        className={topIconBtnClass}
-                        aria-label="Font"
-                        title="Font"
-                        aria-expanded={topMenuOpen === "font"}
-                        onClick={() => toggle("font")}
-                      >
-                        Aa
-                      </button>
-                      {topMenuOpen === "font" && (
-                        <div className={dropdownClass}>
-                          <div className="grid gap-2">
-                            <button
-                              type="button"
-                              className={pillBtnClass}
-                              style={{ fontFamily: "cursive" }}
-                              aria-label="Virgil"
-                              title="Virgil"
-                              onClick={() => {
-                                const next = 1
-                                if (selectionInfo.primary?.type === "text")
-                                  applyToSelection({ fontFamily: next }, (el) => el?.type === "text")
-                                else updateAppState({ currentItemFontFamily: next })
-                                setTopMenuOpen(null)
-                              }}
-                            >
-                              Virgil
-                            </button>
-                            <button
-                              type="button"
-                              className={pillBtnClass}
-                              style={{ fontFamily: "Inter, system-ui, -apple-system, sans-serif" }}
-                              aria-label="Inter"
-                              title="Inter"
-                              onClick={() => {
-                                const next = 2
-                                if (selectionInfo.primary?.type === "text")
-                                  applyToSelection({ fontFamily: next }, (el) => el?.type === "text")
-                                else updateAppState({ currentItemFontFamily: next })
-                                setTopMenuOpen(null)
-                              }}
-                            >
-                              Inter
-                            </button>
-                            <button
-                              type="button"
-                              className={pillBtnClass}
-                              style={{ fontFamily: "\"JetBrains Mono\", ui-monospace, SFMono-Regular, Menlo, monospace" }}
-                              aria-label="JetBrains Mono"
-                              title="JetBrains Mono"
-                              onClick={() => {
-                                const next = 3
-                                if (selectionInfo.primary?.type === "text")
-                                  applyToSelection({ fontFamily: next }, (el) => el?.type === "text")
-                                else updateAppState({ currentItemFontFamily: next })
-                                setTopMenuOpen(null)
-                              }}
-                            >
-                              JetBrains Mono
-                            </button>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="relative" data-topbar-menu-root>
-                      <button
-                        type="button"
-                        className={topIconBtnClass}
-                        aria-label="Font size"
-                        title="Font size"
-                        aria-expanded={topMenuOpen === "fontSize"}
-                        onClick={() => toggle("fontSize")}
-                      >
-                        Tt
-                      </button>
-                      {topMenuOpen === "fontSize" && (
-                        <div className={dropdownClass}>
-                          <input
-                            aria-label="Font size"
-                            className="h-10 w-24 rounded-xl border border-border bg-surface px-2 text-sm text-text-secondary"
-                            type="number"
-                            min={8}
-                            max={256}
-                            value={
-                              selectionInfo.primary?.type === "text" && typeof selectionInfo.primary?.fontSize === "number"
-                                ? selectionInfo.primary.fontSize
-                                : defaults.fontSize
-                            }
-                            onChange={(e) => {
-                              const next = Number(e.target.value)
-                              if (selectionInfo.primary?.type === "text")
-                                applyToSelection({ fontSize: next }, (el) => el?.type === "text")
-                              else updateAppState({ currentItemFontSize: next })
-                            }}
-                          />
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="relative" data-topbar-menu-root>
-                      <button
-                        type="button"
-                        className={topIconBtnClass}
-                        aria-label="Text align"
-                        title="Text align"
-                        aria-expanded={topMenuOpen === "align"}
-                        onClick={() => toggle("align")}
-                      >
-                        <AlignIcon align="center" />
-                      </button>
-                      {topMenuOpen === "align" && (
-                        <div className={dropdownClass}>
-                          <div className="grid grid-cols-3 gap-2">
-                            <button
-                              type="button"
-                              className={pillBtnClass}
-                              aria-label="Align left"
-                              title="Align left"
-                              onClick={() => {
-                                if (selectionInfo.primary?.type === "text")
-                                  applyToSelection({ textAlign: "left" }, (el) => el?.type === "text")
-                                else updateAppState({ currentItemTextAlign: "left" })
-                                setTopMenuOpen(null)
-                              }}
-                            >
-                              <AlignIcon align="left" />
-                            </button>
-                            <button
-                              type="button"
-                              className={pillBtnClass}
-                              aria-label="Align center"
-                              title="Align center"
-                              onClick={() => {
-                                if (selectionInfo.primary?.type === "text")
-                                  applyToSelection({ textAlign: "center" }, (el) => el?.type === "text")
-                                else updateAppState({ currentItemTextAlign: "center" })
-                                setTopMenuOpen(null)
-                              }}
-                            >
-                              <AlignIcon align="center" />
-                            </button>
-                            <button
-                              type="button"
-                              className={pillBtnClass}
-                              aria-label="Align right"
-                              title="Align right"
-                              onClick={() => {
-                                if (selectionInfo.primary?.type === "text")
-                                  applyToSelection({ textAlign: "right" }, (el) => el?.type === "text")
-                                else updateAppState({ currentItemTextAlign: "right" })
-                                setTopMenuOpen(null)
-                              }}
-                            >
-                              <AlignIcon align="right" />
-                            </button>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-
-                    <button type="button" className={topIconBtnClass} aria-label="Bold" title="Bold" disabled>
-                      B
-                    </button>
-                    <button type="button" className={topIconBtnClass} aria-label="Underline" title="Underline" disabled>
-                      U
-                    </button>
-                  </>
-                )}
-
-                {/* SHAPES + STROKES */}
-                {showStyleControls && (
-                  <>
-                    <div className="relative" data-topbar-menu-root>
-                      <button
-                        type="button"
-                        className={topIconBtnClass}
-                        aria-label="Stroke color"
-                        title="Stroke color"
-                        aria-expanded={topMenuOpen === "strokeColor"}
-                        onClick={() => toggle("strokeColor")}
-                      >
-                        <span
-                          aria-hidden
-                          className="h-3.5 w-3.5 rounded-full border border-border"
-                          style={{
-                            backgroundColor: toColorInputValue(
-                              hasSelection
-                                ? ((selectionInfo.primary?.strokeColor as string) || defaults.strokeColor)
-                                : defaults.strokeColor,
-                              "#1f2937"
-                            ),
-                          }}
-                        />
-                      </button>
-                      {topMenuOpen === "strokeColor" && (
-                        <div className={dropdownClass}>
-                          <input
-                            aria-label="Stroke color"
-                            type="color"
-                            className="h-10 w-12 cursor-pointer rounded-xl border border-border bg-transparent p-1"
-                            value={toColorInputValue(
-                              hasSelection ? ((selectionInfo.primary?.strokeColor as string) || defaults.strokeColor) : defaults.strokeColor,
-                              "#1f2937"
-                            )}
-                            onChange={(e) => {
-                              if (hasSelection)
-                                applyToSelection(
-                                  { strokeColor: e.target.value },
-                                  (el) => el?.type !== "text" && el?.type !== "image"
-                                )
-                              else updateAppState({ currentItemStrokeColor: e.target.value })
-                            }}
-                          />
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="relative" data-topbar-menu-root>
-                      <button
-                        type="button"
-                        className={topIconBtnClass}
-                        aria-label="Fill color"
-                        title="Fill color"
-                        aria-expanded={topMenuOpen === "fillColor"}
-                        onClick={() => toggle("fillColor")}
-                      >
-                        <span
-                          aria-hidden
-                          className="h-3.5 w-3.5 rounded-sm border border-border"
-                          style={{
-                            backgroundColor: toColorInputValue(
-                              hasSelection
-                                ? ((selectionInfo.primary?.backgroundColor as string) || defaults.backgroundColor)
-                                : defaults.backgroundColor,
-                              "#ffffff"
-                            ),
-                          }}
-                        />
-                      </button>
-                      {topMenuOpen === "fillColor" && (
-                        <div className={dropdownClass}>
-                          <input
-                            aria-label="Fill color"
-                            type="color"
-                            className="h-10 w-12 cursor-pointer rounded-xl border border-border bg-transparent p-1"
-                            value={toColorInputValue(
-                              hasSelection
-                                ? ((selectionInfo.primary?.backgroundColor as string) || defaults.backgroundColor)
-                                : defaults.backgroundColor,
-                              "#ffffff"
-                            )}
-                            onChange={(e) => {
-                              if (hasSelection)
-                                applyToSelection(
-                                  { backgroundColor: e.target.value },
-                                  (el) => el?.type !== "text" && el?.type !== "image"
-                                )
-                              else updateAppState({ currentItemBackgroundColor: e.target.value })
-                            }}
-                          />
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="relative" data-topbar-menu-root>
-                      <button
-                        type="button"
-                        className={topIconBtnClass}
-                        aria-label="Stroke width"
-                        title="Stroke width"
-                        aria-expanded={topMenuOpen === "strokeWidth"}
-                        onClick={() => toggle("strokeWidth")}
-                      >
-                        ↕
-                      </button>
-                      {topMenuOpen === "strokeWidth" && (
-                        <div className={dropdownClass}>
-                          <input
-                            aria-label="Stroke width"
-                            type="range"
-                            min={1}
-                            max={24}
-                            className="w-64"
-                            value={
-                              hasSelection
-                                ? typeof selectionInfo.primary?.strokeWidth === "number"
-                                  ? selectionInfo.primary.strokeWidth
-                                  : defaults.strokeWidth
-                                : defaults.strokeWidth
-                            }
-                            onChange={(e) => {
-                              const next = Number(e.target.value)
-                              if (hasSelection)
-                                applyToSelection({ strokeWidth: next }, (el) => el?.type !== "text" && el?.type !== "image")
-                              else updateAppState({ currentItemStrokeWidth: next })
-                            }}
-                          />
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="relative" data-topbar-menu-root>
-                      <button
-                        type="button"
-                        className={topIconBtnClass}
-                        aria-label="Stroke style"
-                        title="Stroke style"
-                        aria-expanded={topMenuOpen === "strokeStyle"}
-                        onClick={() => toggle("strokeStyle")}
-                      >
-                        ┄
-                      </button>
-                      {topMenuOpen === "strokeStyle" && (
-                        <div className={dropdownClass}>
-                          <select
-                            aria-label="Stroke style"
-                            className="h-10 w-28 rounded-xl border border-border bg-surface px-2 text-sm text-text-secondary"
-                            value={hasSelection ? ((selectionInfo.primary?.strokeStyle as string) || defaults.strokeStyle) : defaults.strokeStyle}
-                            onChange={(e) => {
-                              if (hasSelection)
-                                applyToSelection({ strokeStyle: e.target.value }, (el) => el?.type !== "text" && el?.type !== "image")
-                              else updateAppState({ currentItemStrokeStyle: e.target.value })
-                            }}
-                          >
-                            <option value="solid">━</option>
-                            <option value="dashed">┄</option>
-                            <option value="dotted">┈</option>
-                          </select>
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="relative" data-topbar-menu-root>
-                      <button
-                        type="button"
-                        className={topIconBtnClass}
-                        aria-label="Sloppiness"
-                        title="Sloppiness"
-                        aria-expanded={topMenuOpen === "roughness"}
-                        onClick={() => toggle("roughness")}
-                      >
-                        〰
-                      </button>
-                      {topMenuOpen === "roughness" && (
-                        <div className={dropdownClass}>
-                          <input
-                            aria-label="Sloppiness"
-                            type="range"
-                            min={0}
-                            max={4}
-                            className="w-64"
-                            value={
-                              hasSelection
-                                ? typeof selectionInfo.primary?.roughness === "number"
-                                  ? selectionInfo.primary.roughness
-                                  : defaults.roughness
-                                : defaults.roughness
-                            }
-                            onChange={(e) => {
-                              const next = Number(e.target.value)
-                              if (hasSelection)
-                                applyToSelection({ roughness: next }, (el) => el?.type !== "text" && el?.type !== "image")
-                              else updateAppState({ currentItemRoughness: next })
-                            }}
-                          />
-                        </div>
-                      )}
-                    </div>
-
-                  </>
-                )}
-
-                {/* IMAGES */}
-                {showImageControls && (
-                  <div className="relative" data-topbar-menu-root>
-                    <button
-                      type="button"
-                      className={topIconBtnClass}
-                      aria-label="Edges"
-                      title="Edges"
-                      aria-expanded={topMenuOpen === "edges"}
-                      onClick={() => toggle("edges")}
-                    >
-                      ▢
-                    </button>
-                    {topMenuOpen === "edges" && (
-                      <div className={dropdownClass}>
-                        <button
-                          type="button"
-                          className={pillBtnClass}
-                          onClick={() => {
-                            const next = defaults.roundness === "round" ? "sharp" : "round"
-                            if (selectionInfo.primary?.type === "image") {
-                              applyToSelection({ roundness: next === "round" ? { type: 3 } : null }, (el) => el?.type === "image")
-                            } else {
-                              updateAppState({ currentItemRoundness: next })
-                            }
-                          }}
-                          aria-label="Toggle edges"
-                          title="Toggle edges"
-                        >
-                          {defaults.roundness === "round" ? "◯" : "▢"}
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {/* COMMON */}
-                <div className="relative" data-topbar-menu-root>
-                  <button
-                    type="button"
-                    className={topIconBtnClass}
-                    aria-label="Opacity"
-                    title="Opacity"
-                    aria-expanded={topMenuOpen === "opacity"}
-                    onClick={() => toggle("opacity")}
-                  >
-                    ◐
-                  </button>
-                  {topMenuOpen === "opacity" && (
-                    <div className={dropdownClass}>
-                      <input
-                        aria-label="Opacity"
-                        type="range"
-                        min={0}
-                        max={100}
-                        className="w-64"
-                        value={
-                          hasSelection
-                            ? typeof selectionInfo.primary?.opacity === "number"
-                              ? selectionInfo.primary.opacity
-                              : defaults.opacity
-                            : defaults.opacity
-                        }
-                        onChange={(e) => {
-                          const next = Number(e.target.value)
-                          if (hasSelection) applyToSelection({ opacity: next })
-                          else updateAppState({ currentItemOpacity: next })
-                        }}
-                      />
-                    </div>
-                  )}
-                </div>
-
-                <button
-                  type="button"
-                  className={topIconBtnClass}
-                  aria-label="Duplicate"
-                  title="Duplicate"
-                  onClick={() => sendShortcut({ key: "d", metaOrCtrl: true })}
-                  disabled={!hasSelection}
-                >
-                  ⧉
-                </button>
-
-                <button
-                  type="button"
-                  className={topIconBtnClass}
-                  aria-label="Delete"
-                  title="Delete"
-                  onClick={() => {
-                    dispatchKeyDown({ key: "Backspace" })
-                    dispatchKeyDown({ key: "Delete" })
-                  }}
-                  disabled={!hasSelection}
-                >
-                  ⌫
-                </button>
-              </div>
-            )
-          })()}
-        </div>
-      </div>
-
-      {/* Left vertical tool column */}
-      <div className="pointer-events-none absolute left-4 top-20 z-50">
-        <div className="pointer-events-auto flex flex-col items-center gap-2 rounded-2xl border border-border bg-surface/85 p-2 shadow-md backdrop-blur">
-          <button type="button" className={iconBtnClass} onClick={sendUndo} title="Undo (Ctrl/Cmd+Z)">
-            ↶
-          </button>
-          <button type="button" className={iconBtnClass} onClick={sendRedo} title="Redo (Ctrl/Cmd+Shift+Z)">
-            ↷
-          </button>
-          <div className="h-px w-10 bg-border/70" />
-          <button
-            type="button"
-            className={`${iconBtnClass} ${activeToolType === "hand" ? iconBtnActiveClass : ""}`}
-            onClick={() => setTool("hand")}
-            title="Pan"
-            aria-label="Pan"
-          >
-            <CursorIcon />
-          </button>
-          <button
-            type="button"
-            className={`${iconBtnClass} ${activeToolType === "text" ? iconBtnActiveClass : ""}`}
-            onClick={() => setTool("text")}
-            title="Text"
-          >
-            <TextBoxIcon />
-          </button>
-
-          <div className="relative" data-shapes-popover-root>
+      {/* Floating top nav (Miro-style): CoLab + board name + right controls. Hidden in presentation mode. */}
+      {!presentationMode && (
+        <div className="pointer-events-none absolute left-0 right-0 top-4 z-50 flex justify-between px-4">
+          <div className="pointer-events-auto flex items-center gap-3 rounded-2xl border border-border bg-surface/90 px-3 py-2 shadow-md backdrop-blur">
             <button
               type="button"
-              className={`${iconBtnClass} ${
-                ["rectangle", "ellipse", "diamond", "arrow", "line"].includes(activeToolType) ? iconBtnActiveClass : ""
-              }`}
-              onClick={() => setShapesOpen((v) => !v)}
-              title="Shapes"
-              aria-expanded={shapesOpen}
+              className="flex items-center gap-2 rounded-lg px-1 py-0.5 text-lg font-bold tracking-tight text-text-primary hover:bg-toolbar transition-colors"
+              onClick={() => navigate("/app/dashboard")}
             >
-              <ShapesIcon />
+              <img src="/logo.png" alt="" className="h-6 w-6" width={24} height={24} />
+              CoLab
             </button>
-            {shapesOpen && (
-              <div className="absolute left-[calc(100%+10px)] top-0 z-50 min-w-56 rounded-2xl border border-border bg-surface p-2 shadow-lg">
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    type="button"
-                    className={pillBtnClass}
-                    onClick={() => {
-                      setTool("rectangle")
-                      setShapesOpen(false)
-                    }}
-                    title="Rectangle"
-                  >
-                    ▭ Rectangle
-                  </button>
-                  <button
-                    type="button"
-                    className={pillBtnClass}
-                    onClick={() => {
-                      setTool("ellipse")
-                      setShapesOpen(false)
-                    }}
-                    title="Ellipse"
-                  >
-                    ◯ Ellipse
-                  </button>
-                  <button
-                    type="button"
-                    className={pillBtnClass}
-                    onClick={() => {
-                      setTool("diamond")
-                      setShapesOpen(false)
-                    }}
-                    title="Diamond"
-                  >
-                    ◇ Diamond
-                  </button>
-                  <button
-                    type="button"
-                    className={pillBtnClass}
-                    onClick={() => {
-                      setTool("arrow")
-                      setShapesOpen(false)
-                    }}
-                    title="Arrow"
-                  >
-                    ➝ Arrow
-                  </button>
-                  <button
-                    type="button"
-                    className={pillBtnClass}
-                    onClick={() => {
-                      setTool("line")
-                      setShapesOpen(false)
-                    }}
-                    title="Line"
-                  >
-                    ／ Line
-                  </button>
-                </div>
-              </div>
+            <span className="h-5 w-px bg-border" aria-hidden />
+            {boardNameEditing ? (
+              <input
+                ref={boardNameInputRef}
+                type="text"
+                value={boardNameDraft}
+                onChange={(e) => setBoardNameDraft(e.target.value)}
+                onBlur={() => {
+                  setBoardNameEditing(false)
+                  const name = boardNameDraft.trim()
+                  if (name && boardId && name !== boardMeta?.name) {
+                    backendApi.updateBoard(boardId, { name }).then(() => setBoardMeta((m) => (m ? { ...m, name } : m)))
+                  }
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") (e.target as HTMLInputElement).blur()
+                  if (e.key === "Escape") setBoardNameDraft(boardMeta?.name ?? "Untitled"), setBoardNameEditing(false)
+                }}
+                className="min-w-[120px] rounded-lg border border-border bg-surface px-2 py-1 text-sm font-medium text-text-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                aria-label="Board name"
+              />
+            ) : (
+              <button
+                type="button"
+                className="rounded-lg px-2 py-1 text-sm font-medium text-text-secondary hover:bg-toolbar hover:text-text-primary transition-colors"
+                onClick={() => {
+                  setBoardNameDraft(boardMeta?.name ?? "Untitled")
+                  setBoardNameEditing(true)
+                  window.setTimeout(() => boardNameInputRef.current?.focus(), 0)
+                }}
+              >
+                {boardMeta?.name?.trim() || "Untitled"}
+              </button>
             )}
           </div>
+          <div className="pointer-events-auto flex items-center gap-1 rounded-2xl border border-border bg-surface/90 p-1 shadow-md backdrop-blur">
+            <button
+              type="button"
+              className={iconBtnClass}
+              onClick={() => setReactionsOpen((v) => !v)}
+              title="Reactions"
+              aria-label="Reactions"
+            >
+              <img src="/reactions-icon.png" alt="" className="h-6 w-6 object-contain" width={24} height={24} />
+            </button>
+            <button
+              type="button"
+              className={iconBtnClass}
+              onClick={() => setActivityOpen((v) => !v)}
+              title="Activity"
+              aria-label="Activity"
+            >
+              <img src="/activity-icon.png" alt="" className="h-6 w-6 object-contain" width={24} height={24} />
+            </button>
+            <button
+              type="button"
+              className={iconBtnClass}
+              onClick={() => setProfileOpen((v) => !v)}
+              title="Profile"
+              aria-label="Profile"
+            >
+              <img src="/profile-icon.png" alt="" className="h-6 w-6 object-contain" width={24} height={24} />
+            </button>
+            <button
+              type="button"
+              className={iconBtnClass}
+              onClick={() => {
+                if (presentationMode) {
+                  setPresentationMode(false)
+                  const rest = presentationRestoreRef.current
+                  if (rest && apiRef.current?.getAppState && apiRef.current?.updateScene) {
+                    const current = apiRef.current.getAppState()
+                    apiRef.current.updateScene({
+                      appState: { ...current, viewBackgroundColor: rest.viewBackgroundColor, gridModeEnabled: rest.gridModeEnabled },
+                      captureUpdate: "IMMEDIATELY",
+                    })
+                  }
+                  if (rest) setGridModeEnabled(rest.gridModeEnabled)
+                  presentationRestoreRef.current = null
+                } else {
+                  const api = apiRef.current
+                  const app = api?.getAppState?.()
+                  presentationRestoreRef.current = {
+                    viewBackgroundColor: (app?.viewBackgroundColor as string) ?? "#ffffff",
+                    gridModeEnabled: Boolean(app?.gridModeEnabled ?? gridModeEnabled),
+                  }
+                  api?.updateScene?.({
+                    appState: { viewBackgroundColor: "#ffffff", gridModeEnabled: false },
+                    captureUpdate: "IMMEDIATELY",
+                  })
+                  setPresentationMode(true)
+                }
+              }}
+              title="Present"
+              aria-label="Present"
+            >
+              <img src="/presentation-icon.png" alt="" className="h-6 w-6 object-contain" width={24} height={24} />
+            </button>
+            <button
+              type="button"
+              className={iconBtnClass}
+              onClick={() => setShareOpen(true)}
+              title="Collaborated"
+              aria-label="Collaborated"
+            >
+              <img src="/share-icon.png" alt="" className="h-6 w-6 object-contain" width={24} height={24} />
+            </button>
+          </div>
+        </div>
+      )}
 
-          <button
-            type="button"
-            className={`${iconBtnClass} ${activeToolType === "laser" ? iconBtnActiveClass : ""}`}
-            onClick={() => setTool("laser")}
-            title="Laser pointer"
-          >
-            ⊙
+      {/* Reactions panel (floating modal) */}
+      {reactionsOpen && !presentationMode && (
+        <>
+          <div className="absolute inset-0 z-[55]" aria-hidden onClick={() => setReactionsOpen(false)} />
+          <div className="absolute right-4 top-16 z-[56] w-72 rounded-2xl border border-border bg-surface p-3 shadow-xl">
+            <div className="text-sm font-semibold text-text-primary">Reactions</div>
+            <p className="mt-1 text-xs text-text-muted">Emoji reactions appear live for collaborators.</p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {["👍", "❤️", "👏", "🔥", "✨"].map((emoji) => (
+                <button key={emoji} type="button" className="rounded-lg border border-border px-2 py-1.5 text-lg hover:bg-toolbar">
+                  {emoji}
+                </button>
+              ))}
+            </div>
+            <div className="mt-3 space-y-1.5 border-t border-border pt-3">
+              <button type="button" className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-text-secondary hover:bg-toolbar">
+                ⏱ Timer
+              </button>
+              <button type="button" className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-text-secondary hover:bg-toolbar">
+                ✓ Voting
+              </button>
+              <button type="button" className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-text-secondary hover:bg-toolbar">
+                🔒 Private Mode
+              </button>
+              <button type="button" className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-text-secondary hover:bg-toolbar">
+                📝 Note
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* Activity panel */}
+      {activityOpen && !presentationMode && (
+        <>
+          <div className="absolute inset-0 z-[55]" aria-hidden onClick={() => setActivityOpen(false)} />
+          <div className="absolute right-4 top-16 z-[56] w-80 rounded-2xl border border-border bg-surface p-3 shadow-xl">
+            <div className="text-sm font-semibold text-text-primary">Activity</div>
+            <p className="mt-1 text-xs text-text-muted">Actions and reactions on this board.</p>
+            <div className="mt-3 max-h-64 overflow-y-auto text-sm text-text-muted">No activity yet.</div>
+          </div>
+        </>
+      )}
+
+      {/* Profile panel */}
+      {profileOpen && !presentationMode && (
+        <>
+          <div className="absolute inset-0 z-[55]" aria-hidden onClick={() => setProfileOpen(false)} />
+          <div className="absolute right-4 top-16 z-[56] w-64 rounded-2xl border border-border bg-surface p-3 shadow-xl">
+            <div className="text-sm font-semibold text-text-primary">Profile</div>
+            <p className="mt-1 text-xs text-text-muted">
+              {boardMeta?.ownerId === authUser?.userId ? "You are the host" : "You are a collaborator"}
+            </p>
+            <button
+              type="button"
+              className="mt-3 w-full rounded-lg border border-border px-3 py-2 text-sm font-medium text-text-secondary hover:bg-toolbar"
+              onClick={() => { setProfileOpen(false); navigate("/app/dashboard") }}
+            >
+              Switch board
+            </button>
+          </div>
+        </>
+      )}
+
+      {/* Floating format row above canvas when a text element is selected */}
+      {!presentationMode && selectionInfo.kind === "text" && selectionInfo.selectedIds.length > 0 && (
+        <div className="pointer-events-auto absolute left-1/2 top-24 z-50 -translate-x-1/2">
+          <div className="flex items-center gap-2 rounded-2xl border border-border bg-surface/95 p-2 shadow-lg backdrop-blur">
+            <select className="rounded-lg border border-border bg-surface px-2 py-1.5 text-sm" onChange={(e) => applyToSelection({ fontFamily: Number(e.target.value) }, (el) => el?.type === "text")} value={selectionInfo.primary?.fontFamily ?? 1}>
+              <option value={1}>Virgil</option>
+              <option value={2}>Inter</option>
+              <option value={3}>Mono</option>
+            </select>
+            <input type="number" min={8} max={72} className="w-12 rounded-lg border border-border bg-surface px-2 py-1.5 text-center text-sm" value={selectionInfo.primary?.fontSize ?? 20} onChange={(e) => applyToSelection({ fontSize: Number(e.target.value) }, (el) => el?.type === "text")} />
+            <button type="button" className={iconBtnClass} title="Bold" onClick={() => dispatchKeyDown({ key: "b", metaOrCtrl: true })}>B</button>
+            <button type="button" className={iconBtnClass} title="Underline">U</button>
+            <div className="h-6 w-px bg-border" />
+            <button type="button" className={iconBtnClass} title="Align left" onClick={() => applyToSelection({ textAlign: "left" }, (el) => el?.type === "text")}>≡</button>
+            <button type="button" className={iconBtnClass} title="Center" onClick={() => applyToSelection({ textAlign: "center" }, (el) => el?.type === "text")}>≡</button>
+            <button type="button" className={iconBtnClass} title="Align right" onClick={() => applyToSelection({ textAlign: "right" }, (el) => el?.type === "text")}>≡</button>
+            <input type="color" className="h-8 w-8 cursor-pointer rounded border border-border" value={toColorInputValue(selectionInfo.primary?.strokeColor as string, "#1f2937")} onChange={(e) => applyToSelection({ strokeColor: e.target.value }, (el) => el?.type === "text")} title="Text color" />
+            <input type="color" className="h-8 w-8 cursor-pointer rounded border border-border" value={toColorInputValue(selectionInfo.primary?.backgroundColor as string, "#ffffff")} onChange={(e) => applyToSelection({ backgroundColor: e.target.value }, (el) => el?.type === "text")} title="Highlight" />
+            <button type="button" className={iconBtnClass} title="More (Copy, Duplicate, Delete, etc.)">⋯</button>
+          </div>
+        </div>
+      )}
+
+      {/* Left vertical tool column + sliding secondary panel. Hidden in presentation mode. */}
+      {!presentationMode && (
+      <div className="pointer-events-none absolute left-4 top-20 z-50 flex items-stretch gap-0" data-left-toolbar>
+        <div className="pointer-events-auto flex flex-col items-center gap-2 rounded-2xl border border-border bg-surface/85 p-2 shadow-md backdrop-blur transition-shadow">
+          <button type="button" className={leftToolbarIconBtnClass} onClick={() => setAiOpen(true)} title="Need Help Generating" aria-label="AI generator">
+            <img src="/ai-icon.png" alt="" className="h-6 w-6 object-contain" width={24} height={24} />
           </button>
-
-          <button
-            type="button"
-            className={iconBtnClass}
-            onClick={() => insertImage()}
-            title="Upload image"
-            aria-label="Upload image"
-          >
-            <PaperclipIcon />
+          <div className="h-px w-10 bg-border/70" />
+          <button type="button" className={`${leftToolbarIconBtnClass} ${activeLeftTool === "hand" ? iconBtnActiveClass : ""}`} onClick={() => selectLeftTool("hand")} title="Cursor" aria-label="Cursor">
+            <img src="/cursor-icon.png" alt="" className="h-6 w-6 object-contain" width={24} height={24} />
           </button>
+          <button type="button" className={`${leftToolbarIconBtnClass} ${activeLeftTool === "formats" ? iconBtnActiveClass : ""}`} onClick={() => selectLeftTool(activeLeftTool === "formats" ? null : "formats")} title="Formats & Flows" aria-label="Formats & Flows">
+            <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" /><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8" /></svg>
+          </button>
+          <button type="button" className={leftToolbarIconBtnClass} onClick={() => { setTemplatesModalOpen(true); selectLeftTool(null) }} title="Templates" aria-label="Templates">
+            <img src="/templates-icon.png" alt="" className="h-6 w-6 object-contain" width={24} height={24} />
+          </button>
+          <button type="button" className={`${leftToolbarIconBtnClass} ${activeLeftTool === "sticky" ? iconBtnActiveClass : ""}`} onClick={() => selectLeftTool(activeLeftTool === "sticky" ? null : "sticky")} title="Sticky Notes" aria-label="Sticky notes">
+            <img src="/sticky-note-icon.png" alt="" className="h-6 w-6 object-contain" width={24} height={24} />
+          </button>
+          <button type="button" className={`${leftToolbarIconBtnClass} ${activeLeftTool === "text" ? iconBtnActiveClass : ""}`} onClick={() => selectLeftTool(activeLeftTool === "text" ? null : "text")} title="Text Box" aria-label="Text Box">
+            <img src="/text-box-icon.png" alt="" className="h-6 w-6 object-contain" width={24} height={24} />
+          </button>
+          <button type="button" className={`${leftToolbarIconBtnClass} ${activeLeftTool === "shapes" ? iconBtnActiveClass : ""}`} onClick={() => selectLeftTool(activeLeftTool === "shapes" ? null : "shapes")} title="Shapes" aria-label="Shapes">
+            <img src="/shapes-icon.png" alt="" className="h-6 w-6 object-contain" width={24} height={24} />
+          </button>
+          <button type="button" className={`${leftToolbarIconBtnClass} ${activeLeftTool === "pencil" ? iconBtnActiveClass : ""}`} onClick={() => selectLeftTool(activeLeftTool === "pencil" ? null : "pencil")} title="Pencil" aria-label="Pencil">
+            <img src="/pencil-icon.png" alt="" className="h-6 w-6 object-contain" width={24} height={24} />
+          </button>
+          <button type="button" className={leftToolbarIconBtnClass} title="Emoji / Stickers" aria-label="Emoji">
+            <img src="/sticker-icon.png" alt="" className="h-6 w-6 object-contain" width={24} height={24} />
+          </button>
+          <button type="button" className={`${leftToolbarIconBtnClass} ${activeLeftTool === "comment" ? iconBtnActiveClass : ""}`} onClick={() => selectLeftTool(activeLeftTool === "comment" ? null : "comment")} title="Comment" aria-label="Comment">
+            <img src="/comment-icon.png" alt="" className="h-6 w-6 object-contain" width={24} height={24} />
+          </button>
+          <button type="button" className={`${leftToolbarIconBtnClass} ${activeLeftTool === "link" ? iconBtnActiveClass : ""}`} onClick={() => selectLeftTool(activeLeftTool === "link" ? null : "link")} title="Link" aria-label="Link">
+            <img src="/link-icon.png" alt="" className="h-6 w-6 object-contain" width={24} height={24} />
+          </button>
+          <div className="h-px w-10 bg-border/70" />
+          <button type="button" className={leftToolbarIconBtnClass} onClick={sendUndo} title="Undo (Ctrl/Cmd+Z)">
+            <img src="/undo-icon.png" alt="" className="h-6 w-6 object-contain" width={24} height={24} />
+          </button>
+          <button type="button" className={leftToolbarIconBtnClass} onClick={sendRedo} title="Redo (Ctrl/Cmd+Shift+Z)">
+            <img src="/redo-icon.png" alt="" className="h-6 w-6 object-contain" width={24} height={24} />
+          </button>
+        </div>
 
+        {/* Sliding secondary panel */}
+        {["formats", "shapes", "pencil", "link"].includes(activeLeftTool || "") && (
+          <div ref={secondaryPanelRef} data-secondary-panel className="pointer-events-auto ml-2 w-56 overflow-hidden rounded-2xl border border-border bg-surface/95 shadow-lg backdrop-blur animate-in slide-in-from-left-2 duration-200">
+            <div className="max-h-[calc(100vh-8rem)] overflow-y-auto p-3">
+              {activeLeftTool === "formats" && (
+                <>
+                  <div className="text-xs font-semibold text-text-muted uppercase tracking-wide">Formats & Flows</div>
+                  <div className="mt-2 space-y-1">
+                    {["Diagram", "Doc", "Slides", "Table", "Timeline", "Kanban", "Flow Chart"].map((label) => (
+                      <button key={label} type="button" className="w-full rounded-lg px-3 py-2 text-left text-sm font-medium text-text-primary hover:bg-toolbar" onClick={() => insertFormatsStructure(label)}>
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+              {activeLeftTool === "shapes" && (
+                <>
+                  <div className="text-xs font-semibold text-text-muted uppercase tracking-wide">Shapes</div>
+                  <div className="mt-2 grid grid-cols-2 gap-1.5">
+                    {(["rectangle", "ellipse", "diamond", "arrow", "line"] as const).map((shape) => (
+                      <button key={shape} type="button" className={pillBtnClass} onClick={() => { setTool(shape); selectLeftTool(null) }}>{shape === "rectangle" ? "▭" : shape === "ellipse" ? "◯" : shape === "diamond" ? "◇" : shape === "arrow" ? "➝" : "／"} {shape}</button>
+                    ))}
+                  </div>
+                  <div className="mt-3 space-y-2 border-t border-border pt-3">
+                    <label className="block text-xs font-medium text-text-secondary">Border</label>
+                    <input type="color" value={shapeStyle.strokeColor} onChange={(e) => setShapeStyle((s) => ({ ...s, strokeColor: e.target.value }))} className="h-8 w-full cursor-pointer rounded border border-border" />
+                    <label className="block text-xs font-medium text-text-secondary">Fill</label>
+                    <input type="color" value={shapeStyle.fillColor} onChange={(e) => setShapeStyle((s) => ({ ...s, fillColor: e.target.value }))} className="h-8 w-full cursor-pointer rounded border border-border" />
+                    <div className="flex gap-2">
+                      <label className="flex-1 text-xs text-text-muted">Border opacity</label>
+                      <input type="range" min="0" max="100" value={shapeStyle.strokeOpacity} onChange={(e) => setShapeStyle((s) => ({ ...s, strokeOpacity: Number(e.target.value) }))} className="w-20" />
+                    </div>
+                    <div className="flex gap-2">
+                      <label className="flex-1 text-xs text-text-muted">Fill opacity</label>
+                      <input type="range" min="0" max="100" value={shapeStyle.fillOpacity} onChange={(e) => setShapeStyle((s) => ({ ...s, fillOpacity: Number(e.target.value) }))} className="w-20" />
+                    </div>
+                  </div>
+                </>
+              )}
+              {activeLeftTool === "pencil" && (
+                <>
+                  <div className="text-xs font-semibold text-text-muted uppercase tracking-wide">Draw</div>
+                  <div className="mt-2 space-y-1">
+                    {(["Pen", "Highlighter", "Eraser", "Lasso"] as const).map((sub) => (
+                      <button key={sub} type="button" className={`w-full rounded-lg px-3 py-2 text-left text-sm ${pencilSubTool === sub.toLowerCase() ? "bg-toolbar font-medium" : ""}`} onClick={() => { setPencilSubTool(sub.toLowerCase() as any); if (sub === "Pen") setTool("freedraw"); if (sub === "Eraser") setTool("eraser"); }}>
+                        {sub}
+                      </button>
+                    ))}
+                  </div>
+                  {(pencilSubTool === "pen" || pencilSubTool === "highlighter") && (
+                    <div className="mt-3 space-y-2 border-t border-border pt-3">
+                      <label className="block text-xs font-medium text-text-secondary">Color</label>
+                      <input type="color" value={pencilOptions.color} onChange={(e) => setPencilOptions((p) => ({ ...p, color: e.target.value }))} className="h-8 w-full cursor-pointer rounded border border-border" />
+                      <label className="block text-xs font-medium text-text-secondary">Stroke size</label>
+                      <input type="range" min="1" max="20" value={pencilOptions.strokeWidth} onChange={(e) => setPencilOptions((p) => ({ ...p, strokeWidth: Number(e.target.value) }))} className="w-full" />
+                      <label className="block text-xs font-medium text-text-secondary">Line style</label>
+                      <select value={pencilOptions.strokeStyle} onChange={(e) => setPencilOptions((p) => ({ ...p, strokeStyle: e.target.value as "solid" | "dashed" }))} className="w-full rounded border border-border bg-surface px-2 py-1 text-sm">
+                        <option value="solid">Solid</option>
+                        <option value="dashed">Dashed</option>
+                      </select>
+                      <label className="block text-xs font-medium text-text-secondary">Opacity</label>
+                      <input type="range" min="0" max="100" value={pencilOptions.opacity} onChange={(e) => setPencilOptions((p) => ({ ...p, opacity: Number(e.target.value) }))} className="w-full" />
+                    </div>
+                  )}
+                </>
+              )}
+              {activeLeftTool === "link" && (
+                <>
+                  <div className="text-xs font-semibold text-text-muted uppercase tracking-wide">Link & media</div>
+                  <div className="mt-2 space-y-1.5">
+                    <button type="button" className="w-full rounded-lg border border-border px-3 py-2 text-left text-sm font-medium hover:bg-toolbar" onClick={() => { const url = window.prompt("Enter URL"); if (url) insertLinkOrEmbed(url); selectLeftTool(null) }}>Insert link</button>
+                    <button type="button" className="w-full rounded-lg border border-border px-3 py-2 text-left text-sm font-medium hover:bg-toolbar" onClick={() => { insertImage(); selectLeftTool(null) }}>Upload image</button>
+                    <button type="button" className="w-full rounded-lg border border-border px-3 py-2 text-left text-sm font-medium hover:bg-toolbar" onClick={() => { const url = window.prompt("Embed URL"); if (url) insertLinkOrEmbed(url); selectLeftTool(null) }}>Embed external content</button>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        )}
+        {activeLeftTool === "sticky" && (
+          <div className="pointer-events-auto ml-2 flex items-center gap-1.5 rounded-2xl border border-border bg-surface/95 px-2 py-2 shadow-md backdrop-blur">
+            <span className="text-xs font-medium text-text-muted">Color</span>
+            {["#fef08a", "#fecdd3", "#bfdbfe", "#bbf7d0", "#e9d5ff", "#e5e7eb"].map((color) => (
+              <button key={color} type="button" className={`h-7 w-7 rounded-lg border-2 ${stickyNoteColor === color ? "border-primary" : "border-transparent"}`} style={{ backgroundColor: color }} onClick={() => setStickyNoteColor(color)} aria-label={`Sticky color ${color}`} />
+            ))}
+          </div>
+        )}
+      </div>
+      )}
+
+      {/* Bottom-right: Grid (left of zoom), then zoom. Hidden in presentation mode. */}
+      {!presentationMode && (
+      <div className="pointer-events-none absolute bottom-4 right-4 z-50">
+        <div className="pointer-events-auto inline-flex items-center gap-1 rounded-2xl border border-border bg-surface/85 p-1 shadow-md backdrop-blur">
           <button
             type="button"
-            className={`${iconBtnClass} ${gridModeEnabled ? iconBtnActiveClass : ""}`}
+            className={`${iconBtnClass} ${effectiveGrid ? iconBtnActiveClass : ""}`}
             onClick={() => {
               setGridModeEnabled((prev) => {
                 const next = !prev
                 const snap = latestRef.current
-                persist({
-                  ...snap,
-                  appState: { ...(snap?.appState || {}), gridModeEnabled: next },
-                })
+                persist({ ...snap, appState: { ...(snap?.appState || {}), gridModeEnabled: next } })
                 return next
               })
             }}
-            aria-pressed={gridModeEnabled}
+            aria-pressed={effectiveGrid}
             title="Grid"
           >
             #
           </button>
-        </div>
-      </div>
-
-      {/* Bottom-right zoom controls */}
-      <div className="pointer-events-none absolute bottom-4 right-4 z-50">
-        <div className="pointer-events-auto inline-flex items-center gap-1 rounded-2xl border border-border bg-surface/85 p-1 shadow-md backdrop-blur">
+          <span className="h-8 w-px bg-border/70" aria-hidden />
           <button type="button" className={iconBtnClass} onClick={sendZoomOut} title="Zoom out" aria-label="Zoom out">
             −
           </button>
@@ -2933,12 +3627,14 @@ export function BoardPage() {
           </button>
         </div>
       </div>
+      )}
 
-      {/* Keep / Discard template review bar (after AI template is placed) */}
-      {showTemplateReview && (
+      {/* Keep / Discard template review bar (after AI template is placed). Hidden in presentation mode. */}
+      {showTemplateReview && !presentationMode && (
         <div className="pointer-events-auto absolute bottom-24 left-1/2 z-50 -translate-x-1/2">
           <div className="inline-flex items-center gap-3 rounded-2xl border border-border bg-surface/95 px-4 py-2.5 shadow-lg backdrop-blur">
             <span className="text-sm font-medium text-text-primary">Template added.</span>
+            <span className="text-xs text-text-muted">Double-click any text to edit.</span>
             <div className="flex items-center gap-2">
               <button
                 type="button"
@@ -2961,31 +3657,22 @@ export function BoardPage() {
         </div>
       )}
 
-      {/* Bottom-center AI template generator */}
+      {/* Bottom-center AI template generator. Hidden in presentation mode. */}
+      {!presentationMode && (
       <div className="pointer-events-none absolute bottom-4 left-1/2 z-50 -translate-x-1/2">
         <div className="pointer-events-auto">
-          <div className="inline-flex items-center gap-2">
-            <button
-              type="button"
-              className="inline-flex h-12 items-center justify-center rounded-2xl border border-border bg-surface/90 px-4 text-sm font-medium text-text-secondary shadow-md backdrop-blur hover:bg-toolbar hover:text-text-primary active:translate-y-px transition duration-fast"
-              onClick={() => setAiOpen(true)}
-              aria-label="Need Help Generating"
-              title="Need Help Generating"
-            >
-              Need Help Generating
-            </button>
-            <button
-              type="button"
-              className="inline-flex h-12 items-center justify-center rounded-2xl border border-border bg-surface/90 px-4 text-sm font-medium text-text-secondary shadow-md backdrop-blur hover:bg-toolbar hover:text-text-primary active:translate-y-px transition duration-fast"
-              onClick={() => setShareOpen(true)}
-              aria-label="Collaborate"
-              title="Collaborate"
-            >
-              Collaborate
-            </button>
-          </div>
+          <button
+            type="button"
+            className="inline-flex h-12 items-center justify-center rounded-2xl border border-border bg-surface/90 px-4 text-sm font-medium text-text-secondary shadow-md backdrop-blur hover:bg-toolbar hover:text-text-primary active:translate-y-px transition duration-fast"
+            onClick={() => setAiOpen(true)}
+            aria-label="Need Help Generating"
+            title="Need Help Generating"
+          >
+            Need Help Generating
+          </button>
         </div>
       </div>
+      )}
 
       {aiOpen && (
         <div className="pointer-events-auto absolute inset-0 z-[60]">
@@ -3090,6 +3777,16 @@ export function BoardPage() {
               </label>
             </div>
 
+            <label className="mt-4 flex cursor-pointer items-center gap-3 rounded-2xl border border-border bg-surface/70 p-3">
+              <input
+                type="checkbox"
+                checked={shareAllowEdit}
+                onChange={(e) => setShareAllowEdit(e.target.checked)}
+                className="h-4 w-4 rounded border-border"
+              />
+              <span className="text-sm font-medium text-text-primary">Allow editing for shared users</span>
+            </label>
+
             <div className="mt-4 rounded-2xl border border-border bg-surface/70 p-3">
               <div className="text-xs font-semibold text-text-muted">Share link</div>
               <div className="mt-1 flex items-center gap-2">
@@ -3141,6 +3838,50 @@ export function BoardPage() {
                 {shareBusy ? "Sharing…" : "Share"}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Premade Templates modal - nearly full screen, left nav + template cards */}
+      {templatesModalOpen && (
+        <div className="pointer-events-auto fixed inset-0 z-[60]" data-templates-modal>
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setTemplatesModalOpen(false)} aria-hidden />
+          <div className="absolute inset-4 flex overflow-hidden rounded-2xl border border-border bg-surface shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <nav className="w-52 shrink-0 border-r border-border p-3">
+              <div className="text-xs font-semibold text-text-muted uppercase tracking-wide">Categories</div>
+              {TEMPLATE_CATEGORIES.map((cat) => (
+                <button key={cat} type="button" className={`mt-2 w-full rounded-lg px-3 py-2 text-left text-sm ${templatesCategory === cat ? "bg-toolbar font-medium text-text-primary" : "text-text-secondary hover:bg-toolbar"}`} onClick={() => setTemplatesCategory(cat)}>{cat}</button>
+              ))}
+            </nav>
+            <div className="flex flex-1 flex-col overflow-hidden">
+              <div className="shrink-0 border-b border-border p-3">
+                <input type="search" placeholder="Search templates…" value={templatesSearch} onChange={(e) => setTemplatesSearch(e.target.value)} className="w-full max-w-md rounded-xl border border-border bg-surface px-4 py-2 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-primary/30" />
+              </div>
+              <div className="flex-1 overflow-y-auto p-4">
+                <div className="grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-5">
+                  {getTemplatesForCategory(templatesCategory)
+                    .filter((t) => !templatesSearch.trim() || t.title.toLowerCase().includes(templatesSearch.toLowerCase()))
+                    .map((t) => (
+                      <button
+                        key={t.id}
+                        type="button"
+                        className="flex flex-col overflow-hidden rounded-xl border-2 border-border bg-surface text-left shadow-lg transition-all hover:border-primary/60 hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-primary/40"
+                        onClick={() => { insertTemplateByKey(t.id); setTemplatesModalOpen(false) }}
+                      >
+                        <div className="flex h-32 w-full items-center justify-center bg-[#f1f5f9] p-2 shadow-inner">
+                          <div className="h-full w-full max-w-[180px] overflow-hidden rounded-lg border border-white/60 bg-white shadow-md">
+                            <TemplatePreviewSvg id={t.id} />
+                          </div>
+                        </div>
+                        <div className="border-t border-border bg-surface px-3 py-2.5 font-semibold text-text-primary text-sm shadow-[0_-1px_0_0_rgba(0,0,0,0.05)]">
+                          {t.title}
+                        </div>
+                      </button>
+                    ))}
+                </div>
+              </div>
+            </div>
+            <button type="button" className="absolute right-4 top-4 rounded-lg p-2 text-text-secondary hover:bg-toolbar" onClick={() => setTemplatesModalOpen(false)} aria-label="Close">×</button>
           </div>
         </div>
       )}
@@ -3241,11 +3982,130 @@ export function BoardPage() {
       <Excalidraw
         excalidrawAPI={handleExcalidrawApi}
         initialData={initialDataForExcalidraw as any}
-        gridModeEnabled={gridModeEnabled}
+        gridModeEnabled={effectiveGrid}
         handleKeyboardGlobally={!aiOpen && !shareOpen && !onboardingOpen && !zoomEditing}
         onChange={handleChange}
         UIOptions={uiOptions}
       />
+
+      {/* Comment: new-comment input at click location (one at a time) */}
+      {!presentationMode && pendingComment != null && (
+        <div
+          data-comment-ui
+          className="pointer-events-auto absolute z-50 w-80 rounded-xl border border-border bg-surface p-4 shadow-xl"
+          style={{
+            left: (pendingComment.x + scrollX) * zoomValue,
+            top: (pendingComment.y + scrollY) * zoomValue,
+            transform: "translate(-50%, -50%)",
+          }}
+        >
+          <textarea
+            value={pendingCommentText}
+            onChange={(e) => setPendingCommentText(e.target.value)}
+            placeholder="Type your comment…"
+            rows={4}
+            className="w-full resize-none rounded-lg border border-border bg-surface px-3 py-2 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-primary/30"
+          />
+          <div className="mt-3 flex justify-end gap-2">
+            <button type="button" className={pillBtnClass} onClick={cancelNewComment}>Cancel</button>
+            <button type="button" className={pillBtnClass} onClick={saveNewComment}>Save</button>
+          </div>
+        </div>
+      )}
+
+      {/* Comment markers on whiteboard: author name, blue bubble, tail to spot; anchored to scene (stationary with canvas) */}
+      {!presentationMode && commentMarkers.length > 0 && (
+        <div className="pointer-events-none absolute inset-0 z-40" aria-hidden>
+          {commentMarkers.map((m) => (
+            <div
+              key={m.id}
+              className="pointer-events-auto absolute cursor-pointer"
+              style={{ left: (m.x + scrollX) * zoomValue, top: (m.y + scrollY) * zoomValue }}
+              onClick={() => setActiveCommentId(activeCommentId === m.id ? null : m.id)}
+            >
+              <div className="relative flex flex-col items-center" style={{ transform: "translate(-50%, -100%)" }}>
+                <div className="rounded-lg bg-blue-500 px-2.5 py-1.5 text-xs font-medium text-white shadow-md whitespace-nowrap">
+                  {m.author || "Comment"}
+                </div>
+                <div
+                  className="h-0 w-0 border-l-[6px] border-r-[6px] border-t-[8px] border-l-transparent border-r-transparent border-t-blue-500"
+                  style={{ marginTop: "-1px" }}
+                  aria-hidden
+                />
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Click-outside backdrop: close thread (does not delete) */}
+      {!presentationMode && activeCommentId != null && (
+        <div
+          className="pointer-events-auto absolute inset-0 z-[45]"
+          aria-hidden
+          onClick={() => setActiveCommentId(null)}
+        />
+      )}
+
+      {/* Comment thread popover: original + replies + reply input (send icon posts, Done closes) */}
+      {!presentationMode && activeCommentId != null && (
+        <div
+          ref={threadPopoverRef}
+          data-comment-ui
+          className="pointer-events-auto absolute bottom-24 left-1/2 z-50 w-96 -translate-x-1/2 rounded-xl border border-border bg-surface p-4 shadow-xl"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-semibold text-text-primary">Comment</span>
+            <button type="button" className="text-text-muted hover:text-text-primary" onClick={() => setActiveCommentId(null)} aria-label="Close">×</button>
+          </div>
+          {(() => {
+            const c = commentMarkers.find((m) => m.id === activeCommentId)
+            if (!c) return null
+            return (
+              <>
+                <div className="mt-3 max-h-48 overflow-y-auto space-y-3 text-sm">
+                  <div className="rounded-lg bg-muted/50 px-3 py-2">
+                    <p className="text-xs font-medium text-text-muted">{c.author}</p>
+                    <p className="mt-0.5 text-text-primary whitespace-pre-wrap">{c.text || "—"}</p>
+                  </div>
+                  {c.replies.map((r, i) => (
+                    <div key={i} className="rounded-lg bg-muted/30 px-3 py-2 pl-4 border-l-2 border-primary/30">
+                      <p className="text-xs font-medium text-text-muted">{r.author}</p>
+                      <p className="mt-0.5 text-text-primary whitespace-pre-wrap">{r.text}</p>
+                    </div>
+                  ))}
+                </div>
+                <div className="mt-3 border-t border-border pt-3">
+                  <div className="flex gap-2">
+                    <textarea
+                      value={replyDraft}
+                      onChange={(e) => setReplyDraft(e.target.value)}
+                      placeholder="Type a reply…"
+                      rows={3}
+                      className="flex-1 resize-none rounded-lg border border-border bg-surface px-3 py-2 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-primary/30"
+                    />
+                    <button
+                      type="button"
+                      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary text-white hover:bg-primary/90"
+                      onClick={saveReply}
+                      aria-label="Send reply"
+                      title="Send"
+                    >
+                      <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2z" />
+                      </svg>
+                    </button>
+                  </div>
+                  <div className="mt-2 flex justify-end">
+                    <button type="button" className={pillBtnClass} onClick={() => setActiveCommentId(null)}>Done</button>
+                  </div>
+                </div>
+              </>
+            )
+          })()}
+        </div>
+      )}
     </div>
   )
 }
