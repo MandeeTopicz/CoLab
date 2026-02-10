@@ -5,50 +5,57 @@ export default {
     extend: {
       colors: {
         /* Base Neutrals */
-        canvas: "#F9FAFB",
+        canvas: "#F0F4F8",
         surface: "#FFFFFF",
-        toolbar: "#F3F4F6",
-        border: "#E5E7EB",
+        toolbar: "#E8EEF4",
+        border: "#D1DDE8",
 
         /* Text Colors */
         text: {
-          primary: "#111827",
-          secondary: "#374151",
-          muted: "#6B7280",
-          disabled: "#9CA3AF",
+          primary: "#0F172A",
+          secondary: "#334155",
+          muted: "#64748B",
+          disabled: "#94A3B8",
           inverse: "#FFFFFF",
         },
 
-        /* Primary Brand / Action */
+        /* Primary (buttons and focus rings) */
         primary: {
-          DEFAULT: "#C5BAAF",
-          hover: "#B4A79B",
-          active: "#A29182",
-          subtle: "#F3EFEB",
+          DEFAULT: "#8093F1",
+          hover: "#6B7FED",
+          active: "#5A6BDB",
+          subtle: "#E0E5FC",
         },
 
-        /* Link color (keep classic blue for text links) */
+        /* Link color */
         link: {
-          DEFAULT: "#2563EB",
-          hover: "#1D4ED8",
-          active: "#1E40AF",
+          DEFAULT: "#3B82F6",
+          hover: "#2563EB",
+          active: "#1D4ED8",
         },
 
-        /* Accent / Creative Colors */
+        /* Accent / Creative (blue-green-purple theme) */
         accent: {
+          blue: "#93C5FD",
+          green: "#6EE7B7",
+          purple: "#C4B5FD",
           yellow: "#FDE68A",
           pink: "#FBCFE8",
-          green: "#BBF7D0",
-          purple: "#DDD6FE",
           orange: "#FED7AA",
           teal: "#99F6E4",
         },
 
         /* Status Colors */
-        success: "#16A34A",
+        success: "#10B981",
         warning: "#F59E0B",
         danger: "#DC2626",
-        info: "#0EA5E9",
+        info: "#3B82F6",
+      },
+
+      backgroundImage: {
+        "gradient-brand": "linear-gradient(135deg, #3B82F6 0%, #10B981 50%, #8B5CF6 100%)",
+        "gradient-brand-hover": "linear-gradient(135deg, #2563EB 0%, #059669 50%, #7C3AED 100%)",
+        "gradient-subtle": "linear-gradient(135deg, rgba(59, 130, 246, 0.08) 0%, rgba(16, 185, 129, 0.08) 50%, rgba(139, 92, 246, 0.08) 100%)",
       },
 
       boxShadow: {
@@ -59,7 +66,7 @@ export default {
       },
 
       fontFamily: {
-        sans: ["Inter", "system-ui", "-apple-system", "BlinkMacSystemFont", "sans-serif"],
+        sans: ["Inter", "ui-sans-serif", "system-ui", "-apple-system", "BlinkMacSystemFont", "sans-serif"],
         mono: ["JetBrains Mono", "ui-monospace", "SFMono-Regular", "Menlo", "monospace"],
       },
 

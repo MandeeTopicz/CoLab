@@ -4,6 +4,7 @@ import { Excalidraw } from "@excalidraw/excalidraw"
 import "@excalidraw/excalidraw/index.css"
 import { getWsUrl, useApi } from "../../lib/api"
 import { useAuth } from "../../auth/AuthProvider"
+import { DEFAULT_FONT_ID, FONT_REGISTRY, getFontById, getFontsByCategory, type FontCategory } from "../../lib/fonts"
 
 function isRecord(v: unknown): v is Record<string, unknown> {
   return typeof v === "object" && v !== null
@@ -51,6 +52,82 @@ function toColorInputValue(value: unknown, fallback: string) {
 
 const ICON_CLASS = "h-6 w-6"
 const ICON_CLASS_LG = "h-7 w-7"
+
+const CATEGORY_LABELS: Record<FontCategory, string> = {
+  Sans: "Sans Serif",
+  Serif: "Serif",
+  Mono: "Monospace",
+  Display: "Display",
+}
+
+function FontPicker({ value, onChange }: { value: number; onChange: (id: number) => void }) {
+  const [open, setOpen] = useState(false)
+  const buttonRef = useRef<HTMLButtonElement>(null)
+  const panelRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!open) return
+    const onOutside = (e: MouseEvent) => {
+      if (buttonRef.current?.contains(e.target as Node) || panelRef.current?.contains(e.target as Node)) return
+      setOpen(false)
+    }
+    window.addEventListener("pointerdown", onOutside)
+    return () => window.removeEventListener("pointerdown", onOutside)
+  }, [open])
+
+  const current = getFontById(value) ?? FONT_REGISTRY[0]
+  const byCategory = getFontsByCategory()
+
+  return (
+    <div className="relative">
+      <button
+        ref={buttonRef}
+        type="button"
+        className="flex min-w-[140px] items-center rounded-lg border border-border bg-surface px-2 py-1.5 text-left text-sm"
+        onClick={() => setOpen((o) => !o)}
+        aria-expanded={open}
+        aria-haspopup="listbox"
+      >
+        <span style={{ fontFamily: current.fontFamily }}>{current.displayName}</span>
+      </button>
+      {open && (
+        <div
+          ref={panelRef}
+          className="absolute left-0 top-full z-[100] mt-1 max-h-64 w-56 overflow-y-auto rounded-lg border border-border bg-surface py-1 shadow-lg"
+          role="listbox"
+        >
+          {(Object.keys(byCategory) as FontCategory[]).map((cat) => {
+            const fonts = byCategory[cat]
+            if (fonts.length === 0) return null
+            return (
+              <div key={cat} className="py-1">
+                <div className="px-3 py-0.5 text-xs font-semibold uppercase tracking-wide text-text-muted">
+                  {CATEGORY_LABELS[cat]}
+                </div>
+                {fonts.map((font) => (
+                  <button
+                    key={font.id}
+                    type="button"
+                    className="flex w-full items-center px-3 py-1.5 text-left text-sm hover:bg-toolbar"
+                    style={{ fontFamily: font.fontFamily }}
+                    onClick={() => {
+                      onChange(font.id)
+                      setOpen(false)
+                    }}
+                    role="option"
+                    aria-selected={value === font.id}
+                  >
+                    {font.displayName}
+                  </button>
+                ))}
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+}
 
 function SaveIcon() {
   return (
@@ -319,7 +396,7 @@ function makeTextElement(opts: {
     text: opts.text,
     originalText: opts.text,
     fontSize,
-    fontFamily: opts.fontFamily ?? 1,
+    fontFamily: opts.fontFamily ?? DEFAULT_FONT_ID,
     textAlign: opts.textAlign ?? "left",
     verticalAlign: opts.verticalAlign ?? "top",
     baseline: Math.max(1, Math.round(fontSize * 0.9)),
@@ -770,11 +847,10 @@ function buildComposedTemplate(id: string): any[] {
       break
     }
     case "flowchart": {
-      const boxW = 100
-      const boxH = 44
-      const nodes = [[-120, -60], [-120, 0], [-120, 60], [80, 0]]
-      nodes.forEach(([x, y]) => elements.push(el(x - boxW / 2, y - boxH / 2, boxW, boxH, { backgroundColor: SECTION_COLORS.blue })))
-      elements.push(arrow(-70, -60, -70, -8), arrow(-70, 8, -70, 60), arrow(-20, 0, 30, 0))
+      const boxW = 100, boxH = 44
+      const centers: [number, number][] = [[-70, -88], [-70, 0], [-70, 88]]
+      centers.forEach(([cx, cy]) => elements.push(el(cx - boxW / 2, cy - boxH / 2, boxW, boxH, { backgroundColor: SECTION_COLORS.blue })))
+      elements.push(arrow(-70, -44, -70, -22), arrow(-70, 22, -70, 44))
       break
     }
     case "org-chart": {
@@ -855,6 +931,339 @@ function buildComposedTemplate(id: string): any[] {
 
 function getTemplatesForCategory(category: string): Array<{ id: string; title: string; previewKind: string }> {
   return TEMPLATES_BY_CATEGORY[category] ?? []
+}
+
+const FORMATS_TOP_LEVEL = ["Doc", "Slides", "Table", "Timeline", "Kanban", "Flow Chart"] as const
+const FORMATS_SUB_OPTIONS: Record<string, string[]> = {
+  Doc: ["Blank Document", "Project Brief", "Meeting Notes", "Product Requirements", "Research Summary"],
+  Slides: ["Title Slide", "Section Slides", "Pitch Deck", "Presentation Outline"],
+  Table: ["Simple Table", "Comparison Table", "Planning Table", "Metrics Table"],
+  Timeline: ["Horizontal Timeline", "Vertical Timeline", "Milestone Timeline", "Roadmap Timeline"],
+  Kanban: ["Basic Kanban", "Scrum Board", "Personal Task Board", "Team Workflow"],
+  "Flow Chart": ["Basic Flow", "Decision Tree", "Process Flow", "Swimlane Flow"],
+}
+
+const FORMATS_GAP = 16
+const FORMATS_GRID = 8
+function snapFormats(n: number) {
+  return Math.round(n / FORMATS_GRID) * FORMATS_GRID
+}
+
+/** Build format-specific elements (origin at 0,0). Caller centers and groups on insert. */
+function buildFormatsStructure(kind: string): any[] {
+  const topLevelToSub: Record<string, string> = {
+    Doc: "Blank Document",
+    Slides: "Title Slide",
+    Table: "Simple Table",
+    Timeline: "Horizontal Timeline",
+    Kanban: "Basic Kanban",
+    "Flow Chart": "Basic Flow",
+  }
+  const subKind = topLevelToSub[kind] ?? kind
+  const el = (x: number, y: number, w: number, h: number, opts?: Partial<{ backgroundColor: string; strokeColor: string }>) =>
+    makeBaseElement("rectangle", { x: snapFormats(x), y: snapFormats(y), width: w, height: h, backgroundColor: opts?.backgroundColor ?? "#f8fafc", strokeColor: opts?.strokeColor ?? "#e2e8f0", strokeWidth: 1 })
+  const txt = (x: number, y: number, w: number, h: number, text: string, fontSize = 14) =>
+    makeTextElement({ x: snapFormats(x), y: snapFormats(y), width: w, height: h, text, fontSize, fontFamily: DEFAULT_FONT_ID })
+  const arrow = (x1: number, y1: number, x2: number, y2: number) =>
+    makeArrowLine("arrow", snapFormats(x1), snapFormats(y1), snapFormats(x2), snapFormats(y2))
+  const line = (x1: number, y1: number, x2: number, y2: number) =>
+    makeArrowLine("line", snapFormats(x1), snapFormats(y1), snapFormats(x2), snapFormats(y2))
+  const boxW = 100
+  const boxH = 44
+  const elements: any[] = []
+
+  switch (subKind) {
+    case "Blank Document": {
+      const w = 320, h = 400
+      elements.push(el(-w / 2, -h / 2, w, h, { backgroundColor: "#ffffff", strokeColor: "#e2e8f0" }))
+      elements.push(txt(-w / 2 + 24, -h / 2 + 24, w - 48, 32, "Title", 18))
+      elements.push(txt(-w / 2 + 24, -h / 2 + 72, w - 48, h - 120, "Start typing…", 14))
+      break
+    }
+    case "Project Brief": {
+      const w = 340, top = -200
+      elements.push(el(-w / 2, top, w, 380, { backgroundColor: "#ffffff", strokeColor: "#e2e8f0" }))
+      elements.push(txt(-w / 2 + 20, top + 16, w - 40, 28, "Project Brief", 20))
+      const sections = ["Overview", "Goals", "Scope", "Timeline", "Team"]
+      sections.forEach((s, i) => { elements.push(txt(-w / 2 + 20, top + 56 + i * 56, w - 40, 24, s, 16)); elements.push(txt(-w / 2 + 20, top + 84 + i * 56, w - 40, 28, "", 14)) })
+      break
+    }
+    case "Meeting Notes": {
+      const w = 320, top = -180
+      elements.push(el(-w / 2, top, w, 360, { backgroundColor: "#ffffff", strokeColor: "#e2e8f0" }))
+      elements.push(txt(-w / 2 + 20, top + 16, w - 40, 24, "Meeting Notes", 18))
+      elements.push(txt(-w / 2 + 20, top + 52, w - 40, 24, "Date / Attendees", 12))
+      for (let i = 0; i < 4; i++) elements.push(txt(-w / 2 + 20, top + 88 + i * 52, w - 40, 44, "• ", 14))
+      break
+    }
+    case "Product Requirements": {
+      const w = 340, top = -200
+      elements.push(el(-w / 2, top, w, 400, { backgroundColor: "#ffffff", strokeColor: "#e2e8f0" }))
+      elements.push(txt(-w / 2 + 20, top + 16, w - 40, 28, "Product Requirements", 20))
+      const rows = ["User stories", "Acceptance criteria", "Constraints", "Out of scope"]
+      rows.forEach((s, i) => { elements.push(txt(-w / 2 + 20, top + 56 + i * 72, w - 40, 22, s, 14)); elements.push(txt(-w / 2 + 20, top + 82 + i * 72, w - 40, 44, "", 12)) })
+      break
+    }
+    case "Research Summary": {
+      const w = 320, top = -180
+      elements.push(el(-w / 2, top, w, 360, { backgroundColor: "#ffffff", strokeColor: "#e2e8f0" }))
+      elements.push(txt(-w / 2 + 20, top + 16, w - 40, 26, "Research Summary", 18))
+      elements.push(txt(-w / 2 + 20, top + 54, w - 40, 22, "Key findings", 14))
+      elements.push(txt(-w / 2 + 20, top + 84, w - 40, 120, "", 12))
+      elements.push(txt(-w / 2 + 20, top + 216, w - 40, 22, "Recommendations", 14))
+      elements.push(txt(-w / 2 + 20, top + 246, w - 40, 90, "", 12))
+      break
+    }
+    case "Title Slide": {
+      const slideW = 280, slideH = 180
+      elements.push(el(-slideW / 2, -slideH / 2, slideW, slideH, { backgroundColor: "#ffffff", strokeColor: "#e2e8f0" }))
+      elements.push(txt(-slideW / 2 + 24, -slideH / 2 + 40, slideW - 48, 36, "Title", 28))
+      elements.push(txt(-slideW / 2 + 24, -slideH / 2 + 90, slideW - 48, 28, "Subtitle", 16))
+      break
+    }
+    case "Section Slides": {
+      const slideW = 240, slideH = 140, gap = 24
+      for (let i = 0; i < 3; i++) {
+        const x = -slideW - gap / 2 + i * (slideW + gap)
+        elements.push(el(x, -slideH / 2, slideW, slideH, { backgroundColor: "#ffffff", strokeColor: "#e2e8f0" }))
+        elements.push(txt(x + 16, -slideH / 2 + 20, slideW - 32, 24, `Section ${i + 1}`, 16))
+        elements.push(txt(x + 16, -slideH / 2 + 52, slideW - 32, 80, "", 12))
+      }
+      break
+    }
+    case "Pitch Deck": {
+      const slideW = 200, slideH = 120, gap = 20
+      for (let i = 0; i < 5; i++) {
+        const x = -2 * (slideW + gap) + i * (slideW + gap)
+        elements.push(el(x, -slideH / 2, slideW, slideH, { backgroundColor: "#ffffff", strokeColor: "#e2e8f0" }))
+        elements.push(txt(x + 12, -slideH / 2 + 16, slideW - 24, 24, i === 0 ? "Title" : `Slide ${i + 1}`, 14))
+      }
+      break
+    }
+    case "Presentation Outline": {
+      const slideW = 220, slideH = 100, gap = 16
+      for (let i = 0; i < 4; i++) {
+        const y = -180 + i * (slideH + gap)
+        elements.push(el(-slideW / 2, y, slideW, slideH, { backgroundColor: "#ffffff", strokeColor: "#e2e8f0" }))
+        elements.push(txt(-slideW / 2 + 16, y + 16, slideW - 32, 24, i === 0 ? "Intro" : i === 3 ? "Conclusion" : `Point ${i}`, 14))
+      }
+      break
+    }
+    case "Simple Table": {
+      const cols = 3, rows = 4, cw = 90, rh = 36
+      const totalW = cols * cw + (cols - 1) * 2
+      const totalH = rows * rh + (rows - 1) * 2
+      for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
+        const x = -totalW / 2 + c * (cw + 2)
+        const y = -totalH / 2 + r * (rh + 2)
+        elements.push(el(x, y, cw, rh, { backgroundColor: r === 0 ? "#f1f5f9" : "#ffffff", strokeColor: "#e2e8f0" }))
+        elements.push(txt(x + 6, y + 8, cw - 12, rh - 16, r === 0 ? `Col ${c + 1}` : "", 12))
+      }
+      break
+    }
+    case "Comparison Table": {
+      const cw = 140, rh = 40
+      const labels = ["Feature", "Option A", "Option B"]
+      for (let c = 0; c < 3; c++) {
+        elements.push(el(-cw * 1.5 - 8 + c * (cw + 4), -82, cw, 36, { backgroundColor: "#e2e8f0", strokeColor: "#cbd5e1" }))
+        elements.push(txt(-cw * 1.5 - 8 + c * (cw + 4) + 8, -76, cw - 16, 24, labels[c], 14))
+        for (let r = 0; r < 4; r++) {
+          const y = -42 + r * (rh + 2)
+          elements.push(el(-cw * 1.5 - 8 + c * (cw + 4), y, cw, rh, { backgroundColor: "#ffffff", strokeColor: "#e2e8f0" }))
+          elements.push(txt(-cw * 1.5 - 8 + c * (cw + 4) + 8, y + 10, cw - 16, 22, "", 12))
+        }
+      }
+      break
+    }
+    case "Planning Table": {
+      const cw = 88, rh = 36
+      const headers = ["Task", "Owner", "Due", "Status"]
+      for (let c = 0; c < 4; c++) {
+        elements.push(el(-180 + c * (cw + 4), -78, cw, 32, { backgroundColor: "#dbeafe", strokeColor: "#93c5fd" }))
+        elements.push(txt(-180 + c * (cw + 4) + 6, -72, cw - 12, 20, headers[c], 12))
+        for (let r = 0; r < 4; r++) {
+          const y = -42 + r * (rh + 2)
+          elements.push(el(-180 + c * (cw + 4), y, cw, rh, { backgroundColor: "#ffffff", strokeColor: "#e2e8f0" }))
+          elements.push(txt(-180 + c * (cw + 4) + 6, y + 8, cw - 12, 22, "", 11))
+        }
+      }
+      break
+    }
+    case "Metrics Table": {
+      const w = 200, h = 120
+      elements.push(el(-w / 2, -h / 2, w, h, { backgroundColor: "#ffffff", strokeColor: "#e2e8f0" }))
+      elements.push(txt(-w / 2 + 12, -h / 2 + 12, w - 24, 22, "Metric", 12))
+      elements.push(txt(-w / 2 + 12, -h / 2 + 38, w - 24, 22, "Value", 12))
+      elements.push(txt(-w / 2 + 12, -h / 2 + 64, w - 24, 22, "Target", 12))
+      elements.push(txt(-w / 2 + 12, -h / 2 + 90, w - 24, 22, "Status", 12))
+      break
+    }
+    case "Horizontal Timeline": {
+      const len = 320
+      elements.push(line(-len / 2, 0, len / 2, 0))
+      for (let i = 0; i < 4; i++) {
+        const x = -len / 2 + (i + 1) * (len / 5)
+        elements.push(el(x - 8, -8, 16, 16, { backgroundColor: "#3b82f6", strokeColor: "#2563eb" }))
+        elements.push(txt(x - 40, 24, 80, 32, `Step ${i + 1}`, 12))
+      }
+      break
+    }
+    case "Vertical Timeline": {
+      const len = 240
+      elements.push(line(0, -len / 2, 0, len / 2))
+      for (let i = 0; i < 4; i++) {
+        const y = -len / 2 + (i + 1) * (len / 5)
+        elements.push(el(-8, y - 8, 16, 16, { backgroundColor: "#3b82f6", strokeColor: "#2563eb" }))
+        elements.push(txt(24, y - 10, 90, 24, `Step ${i + 1}`, 12))
+      }
+      break
+    }
+    case "Milestone Timeline": {
+      const len = 360
+      elements.push(line(-len / 2, 0, len / 2, 0))
+      for (let i = 0; i < 5; i++) {
+        const x = -len / 2 + (i + 0.5) * (len / 5)
+        elements.push(el(x - 12, -12, 24, 24, { backgroundColor: "#8b5cf6", strokeColor: "#7c3aed" }))
+        elements.push(txt(x - 35, 28, 70, 36, `M${i + 1}`, 11))
+      }
+      break
+    }
+    case "Roadmap Timeline": {
+      const len = 320
+      elements.push(line(-len / 2, 20, len / 2, 20))
+      const phases = ["Q1", "Q2", "Q3", "Q4"]
+      for (let i = 0; i < 4; i++) {
+        const x = -len / 2 + (i + 0.5) * (len / 4)
+        elements.push(el(x - 28, -24, 56, 32, { backgroundColor: "#dbeafe", strokeColor: "#93c5fd" }))
+        elements.push(txt(x - 20, -16, 40, 20, phases[i], 12))
+        elements.push(txt(x - 35, 48, 70, 44, "", 11))
+      }
+      break
+    }
+    case "Basic Kanban": {
+      const colW = 140, cardW = 120, cardH = 56
+      const cols = ["To Do", "Doing", "Done"]
+      cols.forEach((label, c) => {
+        const x = -colW * 1.5 - FORMATS_GAP + c * (colW + FORMATS_GAP)
+        elements.push(el(x, -100, colW, 32, { backgroundColor: "#e2e8f0", strokeColor: "#cbd5e1" }))
+        elements.push(txt(x + 8, -94, colW - 16, 20, label, 14))
+        for (let r = 0; r < 2; r++) {
+          elements.push(el(x + (colW - cardW) / 2, -56 + r * (cardH + 8), cardW, cardH, { backgroundColor: "#ffffff", strokeColor: "#e2e8f0" }))
+          elements.push(txt(x + (colW - cardW) / 2 + 8, -56 + r * (cardH + 8) + 12, cardW - 16, 34, "", 12))
+        }
+      })
+      break
+    }
+    case "Scrum Board": {
+      const colW = 150, cardW = 130, cardH = 52
+      const cols = ["To Do", "In Progress", "Done"]
+      cols.forEach((label, c) => {
+        const x = -225 + c * (colW + FORMATS_GAP)
+        elements.push(el(x, -94, colW, 36, { backgroundColor: "#dbeafe", strokeColor: "#93c5fd" }))
+        elements.push(txt(x + 10, -86, colW - 20, 22, label, 14))
+        const n = c === 1 ? 3 : 2
+        for (let r = 0; r < n; r++) {
+          elements.push(el(x + (colW - cardW) / 2, -50 + r * (cardH + 8), cardW, cardH, { backgroundColor: "#ffffff", strokeColor: "#e2e8f0" }))
+          elements.push(txt(x + (colW - cardW) / 2 + 8, -50 + r * (cardH + 8) + 10, cardW - 16, 34, "", 12))
+        }
+      })
+      break
+    }
+    case "Personal Task Board": {
+      const colW = 120, cardW = 100, cardH = 44
+      const cols = ["Backlog", "This Week", "Done"]
+      cols.forEach((label, c) => {
+        const x = -180 + c * (colW + FORMATS_GAP)
+        elements.push(el(x, -80, colW, 28, { backgroundColor: "#f1f5f9", strokeColor: "#e2e8f0" }))
+        elements.push(txt(x + 6, -74, colW - 12, 18, label, 12))
+        for (let r = 0; r < 2; r++) {
+          elements.push(el(x + (colW - cardW) / 2, -48 + r * (cardH + 6), cardW, cardH, { backgroundColor: "#ffffff", strokeColor: "#e2e8f0" }))
+          elements.push(txt(x + (colW - cardW) / 2 + 6, -48 + r * (cardH + 6) + 10, cardW - 12, 26, "", 11))
+        }
+      })
+      break
+    }
+    case "Team Workflow": {
+      const colW = 130, cardW = 110, cardH = 48
+      const cols = ["Requested", "In Progress", "Review", "Done"]
+      cols.forEach((label, c) => {
+        const x = -270 + c * (colW + FORMATS_GAP)
+        elements.push(el(x, -88, colW, 30, { backgroundColor: "#e0e7ff", strokeColor: "#a5b4fc" }))
+        elements.push(txt(x + 8, -82, colW - 16, 20, label, 12))
+        for (let r = 0; r < 2; r++) {
+          elements.push(el(x + (colW - cardW) / 2, -52 + r * (cardH + 6), cardW, cardH, { backgroundColor: "#ffffff", strokeColor: "#e2e8f0" }))
+          elements.push(txt(x + (colW - cardW) / 2 + 6, -52 + r * (cardH + 6) + 12, cardW - 12, 28, "", 11))
+        }
+      })
+      break
+    }
+    case "Basic Flow": {
+      const boxW = 100, boxH = 44
+      const centers: [number, number][] = [[0, -88], [0, 0], [0, 88]]
+      const labels = ["Start", "Process", "End"]
+      centers.forEach(([cx, cy], i) => {
+        const x = cx - boxW / 2, y = cy - boxH / 2
+        elements.push(el(x, y, boxW, boxH, { backgroundColor: "#dbeafe", strokeColor: "#3b82f6" }))
+        elements.push(txt(x + 8, y + 12, boxW - 16, boxH - 24, labels[i], 16))
+      })
+      elements.push(arrow(0, -44, 0, -22), arrow(0, 22, 0, 44))
+      break
+    }
+    case "Decision Tree": {
+      const boxW = 80, boxH = 40, dia = 72
+      const dx = -dia / 2, dy = -80
+      elements.push(makeBaseElement("diamond", { x: dx, y: dy, width: dia, height: dia, backgroundColor: "#fef3c7", strokeColor: "#eab308" }))
+      elements.push(txt(dx + 12, dy + 22, dia - 24, 28, "Decision?", 14))
+      const yesX = -124
+      const noX = 44
+      const branchY = 20
+      elements.push(el(yesX, branchY - boxH / 2, boxW, boxH, { backgroundColor: "#d1fae5", strokeColor: "#10b981" }))
+      elements.push(txt(yesX + 6, branchY - boxH / 2 + 10, boxW - 12, 24, "Yes", 14))
+      elements.push(el(noX, branchY - boxH / 2, boxW, boxH, { backgroundColor: "#fee2e2", strokeColor: "#ef4444" }))
+      elements.push(txt(noX + 6, branchY - boxH / 2 + 10, boxW - 12, 24, "No", 14))
+      elements.push(arrow(-36, -44, yesX + boxW, 0), arrow(36, -44, noX, 0))
+      break
+    }
+    case "Process Flow": {
+      const boxW = 90, boxH = 44, gap = 4
+      const labels = ["Input", "Process", "Review", "Output"]
+      const totalW = 4 * boxW + 3 * gap
+      const cx = -totalW / 2
+      for (let i = 0; i < 4; i++) {
+        const x = cx + i * (boxW + gap), y = -boxH / 2
+        elements.push(el(x, y, boxW, boxH, { backgroundColor: "#dbeafe", strokeColor: "#3b82f6" }))
+        elements.push(txt(x + 6, y + 12, boxW - 12, boxH - 24, labels[i], 14))
+      }
+      elements.push(arrow(cx + boxW, 0, cx + boxW + gap, 0), arrow(cx + boxW + gap + boxW, 0, cx + 2 * (boxW + gap), 0), arrow(cx + 2 * (boxW + gap) + boxW, 0, cx + 3 * (boxW + gap), 0))
+      break
+    }
+    case "Swimlane Flow": {
+      const laneW = 320, laneH = 80, headerH = 28, boxW = 80, boxH = 44, gap = 4
+      const left = -laneW / 2, topA = -laneH - headerH - 8
+      elements.push(el(left, topA, laneW, headerH, { backgroundColor: "#e2e8f0", strokeColor: "#94a3b8" }))
+      elements.push(txt(left + 12, topA + 6, 100, 18, "Lane A", 14))
+      elements.push(el(left, topA + headerH, laneW, laneH, { backgroundColor: "#f8fafc", strokeColor: "#e2e8f0" }))
+      const a1X = left + 40, a2X = left + 40 + boxW + gap
+      const aY = topA + headerH + (laneH - boxH) / 2
+      elements.push(el(a1X, aY, boxW, boxH, { backgroundColor: "#dbeafe", strokeColor: "#3b82f6" }))
+      elements.push(txt(a1X + 6, aY + 12, boxW - 12, 24, "Step 1", 14))
+      elements.push(el(a2X, aY, boxW, boxH, { backgroundColor: "#dbeafe", strokeColor: "#3b82f6" }))
+      elements.push(txt(a2X + 6, aY + 12, boxW - 12, 24, "Step 2", 14))
+      elements.push(arrow(a1X + boxW, aY + boxH / 2, a2X, aY + boxH / 2))
+      const topB = 8
+      elements.push(el(left, topB, laneW, headerH, { backgroundColor: "#e2e8f0", strokeColor: "#94a3b8" }))
+      elements.push(txt(left + 12, topB + 6, 100, 18, "Lane B", 14))
+      elements.push(el(left, topB + headerH, laneW, laneH, { backgroundColor: "#f8fafc", strokeColor: "#e2e8f0" }))
+      const bX = left + 40, bY = topB + headerH + (laneH - boxH) / 2
+      elements.push(el(bX, bY, boxW, boxH, { backgroundColor: "#d1fae5", strokeColor: "#10b981" }))
+      elements.push(txt(bX + 6, bY + 12, boxW - 12, 24, "Output", 14))
+      elements.push(arrow(left + laneW / 2, topA + headerH + laneH, left + laneW / 2, topB))
+      break
+    }
+    default:
+      return []
+  }
+  return elements
 }
 
 const PREVIEW_COLORS = {
@@ -1382,7 +1791,7 @@ function generateTemplateElements(args: {
       width: TEMPLATE_TITLE_WIDTH,
       height: 44,
       text: titleText,
-      fontFamily: 2,
+      fontFamily: DEFAULT_FONT_ID,
       fontSize: titleFontSize,
       textAlign: "center",
       strokeColor: "#0f172a",
@@ -1438,7 +1847,7 @@ function generateTemplateElements(args: {
           width: colW - 28,
           height: 26,
           text: label.title,
-          fontFamily: 2,
+          fontFamily: DEFAULT_FONT_ID,
           fontSize: 18,
           strokeColor: "#0f172a",
         })
@@ -1468,7 +1877,7 @@ function generateTemplateElements(args: {
             width: colW - 44,
             height: 44,
             text,
-            fontFamily: 2,
+            fontFamily: DEFAULT_FONT_ID,
             fontSize: 14,
             strokeColor: "#0f172a",
           })
@@ -1528,7 +1937,7 @@ function generateTemplateElements(args: {
           width: colW - 28,
           height: 26,
           text: label.title,
-          fontFamily: 2,
+          fontFamily: DEFAULT_FONT_ID,
           fontSize: 18,
           strokeColor: "#0f172a",
         })
@@ -1560,7 +1969,7 @@ function generateTemplateElements(args: {
             width: colW - 44,
             height: 38,
             text,
-            fontFamily: 2,
+            fontFamily: DEFAULT_FONT_ID,
             fontSize: 14,
             strokeColor: "#0f172a",
           })
@@ -1640,7 +2049,7 @@ function generateTemplateElements(args: {
           width: cardW - 24,
           height: cardH - 24,
           text,
-          fontFamily: 2,
+          fontFamily: DEFAULT_FONT_ID,
           fontSize: 15,
           strokeColor: "#0f172a",
         })
@@ -1690,7 +2099,7 @@ function generateTemplateElements(args: {
           width: sectionW - 24,
           height: 24,
           text: sec.title,
-          fontFamily: 2,
+          fontFamily: DEFAULT_FONT_ID,
           fontSize: 16,
           strokeColor: "#0f172a",
         })
@@ -1703,7 +2112,7 @@ function generateTemplateElements(args: {
             width: sectionW - 24,
             height: sectionH - 54,
             text: sec.hint,
-            fontFamily: 2,
+            fontFamily: DEFAULT_FONT_ID,
             fontSize: 13,
             strokeColor: "#64748b",
           })
@@ -1758,7 +2167,7 @@ function generateTemplateElements(args: {
           width: cardW - 28,
           height: 24,
           text: c.title,
-          fontFamily: 2,
+          fontFamily: DEFAULT_FONT_ID,
           fontSize: 17,
           strokeColor: "#0f172a",
         })
@@ -1770,7 +2179,7 @@ function generateTemplateElements(args: {
           width: cardW - 28,
           height: cardH - 58,
           text: c.hint,
-          fontFamily: 2,
+          fontFamily: DEFAULT_FONT_ID,
           fontSize: 14,
           strokeColor: "#64748b",
         })
@@ -1836,6 +2245,8 @@ export function BoardPage() {
   )
 
   const apiRef = useRef<any>(null)
+  const rightClickStartRef = useRef<number | null>(null)
+  const rightClickDurationRef = useRef<number>(0)
   const [shapesOpen, setShapesOpen] = useState(false)
   const [activeLeftTool, setActiveLeftTool] = useState<string | null>(null)
   const [pencilSubTool, setPencilSubTool] = useState<"pen" | "highlighter" | "eraser" | "lasso" | null>(null)
@@ -1913,7 +2324,7 @@ export function BoardPage() {
     strokeWidth: 2,
     strokeStyle: "solid",
     roughness: 1,
-    fontFamily: 1,
+    fontFamily: DEFAULT_FONT_ID,
     fontSize: 20,
     textAlign: "left",
     roundness: "sharp",
@@ -1945,6 +2356,7 @@ export function BoardPage() {
   const [reactionsOpen, setReactionsOpen] = useState(false)
   const [activityOpen, setActivityOpen] = useState(false)
   const [profileOpen, setProfileOpen] = useState(false)
+  const [formatsActiveCategory, setFormatsActiveCategory] = useState<string | null>(null)
   const [boardNameEditing, setBoardNameEditing] = useState(false)
   const [boardNameDraft, setBoardNameDraft] = useState("")
   const boardNameInputRef = useRef<HTMLInputElement | null>(null)
@@ -1959,6 +2371,11 @@ export function BoardPage() {
   const [saveAsBusy, setSaveAsBusy] = useState(false)
   const [saveAsError, setSaveAsError] = useState<string | null>(null)
   const saveAsNameRef = useRef<HTMLInputElement | null>(null)
+  const [publishTemplateOpen, setPublishTemplateOpen] = useState(false)
+  const [publishTemplateName, setPublishTemplateName] = useState("")
+  const [publishTemplateDescription, setPublishTemplateDescription] = useState("")
+  const [publishTemplateBusy, setPublishTemplateBusy] = useState(false)
+  const [publishTemplateNotice, setPublishTemplateNotice] = useState<string | null>(null)
 
   const toSerializableAppState = useCallback(
     (appState: any) => {
@@ -2399,40 +2816,9 @@ export function BoardPage() {
   }, [])
 
   const insertFormatsStructure = useCallback((kind: string) => {
-    const cx = 0
-    const cy = 0
-    const el = (x: number, y: number, w: number, h: number, opts?: Partial<{ strokeColor: string; backgroundColor: string; opacity: number }>) =>
-      makeBaseElement("rectangle", { x, y, width: w, height: h, ...opts })
-    const txt = (x: number, y: number, w: number, h: number, text: string) =>
-      makeTextElement({ x, y, width: w, height: h, text })
-    let elements: any[] = []
-    const gap = 12
-    const cardW = 160
-    const cardH = 56
-    if (kind === "Diagram") {
-      elements = [el(cx - 120, cy - 60, 80, 40), el(cx, cy - 60, 80, 40), el(cx + 120, cy - 60, 80, 40), el(cx - 60, cy, 80, 40), el(cx + 60, cy, 80, 40), el(cx, cy + 60, 80, 40)]
-    } else if (kind === "Doc") {
-      elements = [el(cx - 200, cy - 120, 400, 40), el(cx - 200, cy - 60, 400, 200), el(cx - 200, cy + 150, 400, 40)]
-    } else if (kind === "Slides") {
-      for (let i = 0; i < 3; i++) elements.push(el(cx - 180 + i * 140, cy - 50, 120, 90))
-    } else if (kind === "Table") {
-      for (let r = 0; r < 4; r++) for (let c = 0; c < 3; c++) elements.push(el(cx - 120 + c * 90, cy - 80 + r * 44, 80, 36))
-    } else if (kind === "Timeline") {
-      for (let i = 0; i < 5; i++) {
-        elements.push(el(cx - 200 + i * 100, cy - 20, 12, 12))
-        elements.push(el(cx - 200 + i * 100, cy + 10, 70, 40))
-      }
-    } else if (kind === "Kanban") {
-      for (let col = 0; col < 3; col++) {
-        elements.push(el(cx - 180 + col * 140, cy - 100, 120, 28))
-        for (let row = 0; row < 2; row++) elements.push(el(cx - 172 + col * 140, cy - 64 + row * 52, 104, 44))
-      }
-    } else if (kind === "Flow Chart") {
-      elements = [el(cx - 80, cy - 80, 80, 40), el(cx - 80, cy, 80, 40), el(cx - 80, cy + 80, 80, 40), el(cx + 40, cy, 80, 40)]
-    }
+    const elements = buildFormatsStructure(kind)
     if (elements.length) {
-      insertElementsAtCenter(elements)
-      selectLeftTool(null)
+      insertElementsAtCenter(elements, { selectAndGroup: true })
     }
   }, [insertElementsAtCenter])
 
@@ -2450,19 +2836,19 @@ export function BoardPage() {
       "4ls-retro": "Kanban",
       "standup": "Timeline",
       "brainstorm-grid": "Table",
-      "mind-map": "Diagram",
+      "mind-map": "Flow Chart",
       "affinity": "Kanban",
       "kanban-board": "Kanban",
       "sprint-backlog": "Doc",
       "retro-board": "Kanban",
       "flowchart": "Flow Chart",
       "slide-deck": "Slides",
-      "wireframe": "Diagram",
+      "wireframe": "Doc",
       "moodboard": "Table",
     }
     const format = formatMap[key]
     if (format) insertFormatsStructure(format)
-    else insertFormatsStructure("Diagram")
+    else insertFormatsStructure("Doc")
   }, [insertFormatsStructure, insertElementsAtCenter])
 
   const insertLinkOrEmbed = useCallback((url: string) => {
@@ -2511,6 +2897,23 @@ export function BoardPage() {
     api.updateScene({ elements: [...existing, rect, textEl], captureUpdate: "IMMEDIATELY" })
     selectLeftTool(null)
   }, [stickyNoteColor])
+
+  const handleContextMenuCapture = useCallback((e: React.MouseEvent) => {
+    if (rightClickDurationRef.current >= 1000) e.preventDefault()
+  }, [])
+
+  const handleRightClickTracking = useCallback((e: React.PointerEvent) => {
+    if (e.button === 2) {
+      rightClickStartRef.current = Date.now()
+    }
+  }, [])
+
+  const handleRightClickUp = useCallback((e: React.PointerEvent) => {
+    if (e.button === 2) {
+      rightClickDurationRef.current = rightClickStartRef.current != null ? Date.now() - rightClickStartRef.current : 0
+      rightClickStartRef.current = null
+    }
+  }, [])
 
   const handleCanvasPointerDown = useCallback((e: React.PointerEvent) => {
     if (activeLeftTool !== "sticky" && activeLeftTool !== "comment") return
@@ -2928,7 +3331,7 @@ export function BoardPage() {
           strokeWidth: typeof appState?.currentItemStrokeWidth === "number" ? appState.currentItemStrokeWidth : 2,
           strokeStyle: (appState?.currentItemStrokeStyle as string) || "solid",
           roughness: typeof appState?.currentItemRoughness === "number" ? appState.currentItemRoughness : 1,
-          fontFamily: typeof appState?.currentItemFontFamily === "number" ? appState.currentItemFontFamily : 1,
+          fontFamily: typeof appState?.currentItemFontFamily === "number" ? appState.currentItemFontFamily : DEFAULT_FONT_ID,
           fontSize: typeof appState?.currentItemFontSize === "number" ? appState.currentItemFontSize : 20,
           textAlign: (appState?.currentItemTextAlign as any) || "left",
           roundness: (appState?.currentItemRoundness as any) || "sharp",
@@ -3204,7 +3607,14 @@ export function BoardPage() {
   const effectiveViewBackground = presentationMode ? "#ffffff" : undefined
 
   return (
-    <div ref={containerRef} style={{ position: "absolute", inset: 0 }} onPointerDown={handleCanvasPointerDown}>
+    <div
+        ref={containerRef}
+        style={{ position: "absolute", inset: 0 }}
+        onPointerDownCapture={handleRightClickTracking}
+        onPointerUpCapture={handleRightClickUp}
+        onContextMenuCapture={handleContextMenuCapture}
+        onPointerDown={handleCanvasPointerDown}
+      >
       {/* Hide Excalidraw's built-in toolbars/menus (we render our own). */}
       <style>{`
         .excalidraw .App-toolbar-container,
@@ -3215,17 +3625,17 @@ export function BoardPage() {
         }
       `}</style>
 
-      {/* Floating top nav (Miro-style): CoLab + board name + right controls. Hidden in presentation mode. */}
+      {/* Floating top nav (Miro-style): colab + board name + right controls. Hidden in presentation mode. */}
       {!presentationMode && (
         <div className="pointer-events-none absolute left-0 right-0 top-4 z-50 flex justify-between px-4">
           <div className="pointer-events-auto flex items-center gap-3 rounded-2xl border border-border bg-surface/90 px-3 py-2 shadow-md backdrop-blur">
             <button
               type="button"
-              className="flex items-center gap-2 rounded-lg px-1 py-0.5 text-lg font-bold tracking-tight text-text-primary hover:bg-toolbar transition-colors"
+              className="flex items-center gap-2 rounded-lg px-1 py-0.5 text-lg font-bold tracking-tight text-text-primary hover:bg-toolbar transition-colors font-sans"
               onClick={() => navigate("/app/dashboard")}
             >
               <img src="/logo.png" alt="" className="h-6 w-6" width={24} height={24} />
-              CoLab
+              colab
             </button>
             <span className="h-5 w-px bg-border" aria-hidden />
             {boardNameEditing ? (
@@ -3261,6 +3671,20 @@ export function BoardPage() {
                 {boardMeta?.name?.trim() || "Untitled"}
               </button>
             )}
+            <span className="h-5 w-px bg-border" aria-hidden />
+            <button
+              type="button"
+              className="rounded-lg px-2 py-1 text-sm font-medium text-text-secondary hover:bg-toolbar hover:text-text-primary transition-colors"
+              onClick={() => {
+                setPublishTemplateName(boardMeta?.name?.trim() || "Untitled")
+                setPublishTemplateDescription("")
+                setPublishTemplateNotice(null)
+                setPublishTemplateOpen(true)
+              }}
+              title="Publish as Template"
+            >
+              Publish as Template
+            </button>
           </div>
           <div className="pointer-events-auto flex items-center gap-1 rounded-2xl border border-border bg-surface/90 p-1 shadow-md backdrop-blur">
             <button
@@ -3406,11 +3830,10 @@ export function BoardPage() {
       {!presentationMode && selectionInfo.kind === "text" && selectionInfo.selectedIds.length > 0 && (
         <div className="pointer-events-auto absolute left-1/2 top-24 z-50 -translate-x-1/2">
           <div className="flex items-center gap-2 rounded-2xl border border-border bg-surface/95 p-2 shadow-lg backdrop-blur">
-            <select className="rounded-lg border border-border bg-surface px-2 py-1.5 text-sm" onChange={(e) => applyToSelection({ fontFamily: Number(e.target.value) }, (el) => el?.type === "text")} value={selectionInfo.primary?.fontFamily ?? 1}>
-              <option value={1}>Virgil</option>
-              <option value={2}>Inter</option>
-              <option value={3}>Mono</option>
-            </select>
+            <FontPicker
+              value={typeof selectionInfo.primary?.fontFamily === "number" ? selectionInfo.primary.fontFamily : DEFAULT_FONT_ID}
+              onChange={(id) => applyToSelection({ fontFamily: id }, (el) => el?.type === "text")}
+            />
             <input type="number" min={8} max={72} className="w-12 rounded-lg border border-border bg-surface px-2 py-1.5 text-center text-sm" value={selectionInfo.primary?.fontSize ?? 20} onChange={(e) => applyToSelection({ fontSize: Number(e.target.value) }, (el) => el?.type === "text")} />
             <button type="button" className={iconBtnClass} title="Bold" onClick={() => dispatchKeyDown({ key: "b", metaOrCtrl: true })}>B</button>
             <button type="button" className={iconBtnClass} title="Underline">U</button>
@@ -3474,14 +3897,19 @@ export function BoardPage() {
 
         {/* Sliding secondary panel */}
         {["formats", "shapes", "pencil", "link"].includes(activeLeftTool || "") && (
-          <div ref={secondaryPanelRef} data-secondary-panel className="pointer-events-auto ml-2 w-56 overflow-hidden rounded-2xl border border-border bg-surface/95 shadow-lg backdrop-blur animate-in slide-in-from-left-2 duration-200">
-            <div className="max-h-[calc(100vh-8rem)] overflow-y-auto p-3">
+          <div ref={secondaryPanelRef} data-secondary-panel className="pointer-events-auto ml-2 flex overflow-hidden rounded-2xl border border-border bg-surface/95 shadow-lg backdrop-blur animate-in slide-in-from-left-2 duration-200">
+            <div className="max-h-[calc(100vh-8rem)] w-56 overflow-y-auto p-3">
               {activeLeftTool === "formats" && (
                 <>
                   <div className="text-xs font-semibold text-text-muted uppercase tracking-wide">Formats & Flows</div>
-                  <div className="mt-2 space-y-1">
-                    {["Diagram", "Doc", "Slides", "Table", "Timeline", "Kanban", "Flow Chart"].map((label) => (
-                      <button key={label} type="button" className="w-full rounded-lg px-3 py-2 text-left text-sm font-medium text-text-primary hover:bg-toolbar" onClick={() => insertFormatsStructure(label)}>
+                  <div className="mt-2 space-y-0.5">
+                    {FORMATS_TOP_LEVEL.map((label) => (
+                      <button
+                        key={label}
+                        type="button"
+                        className={`w-full rounded-lg px-3 py-2 text-left text-sm font-medium hover:bg-toolbar ${formatsActiveCategory === label ? "bg-toolbar text-text-primary" : "text-text-primary"}`}
+                        onClick={() => setFormatsActiveCategory((c) => (c === label ? null : label))}
+                      >
                         {label}
                       </button>
                     ))}
@@ -3550,6 +3978,25 @@ export function BoardPage() {
                 </>
               )}
             </div>
+            {activeLeftTool === "formats" && formatsActiveCategory != null && (
+              <div className="flex min-w-0 border-l border-border bg-surface/95">
+                <div className="max-h-[calc(100vh-8rem)] w-52 overflow-y-auto p-3">
+                  <div className="rounded-lg bg-toolbar/70 px-2 py-1.5 text-xs font-semibold text-text-muted uppercase tracking-wide">{formatsActiveCategory}</div>
+                  <div className="mt-2 space-y-0.5">
+                    {(FORMATS_SUB_OPTIONS[formatsActiveCategory] ?? []).map((sub) => (
+                      <button
+                        key={sub}
+                        type="button"
+                        className="w-full rounded-lg px-3 py-2 text-left text-sm font-medium text-text-primary hover:bg-toolbar"
+                        onClick={() => insertFormatsStructure(sub)}
+                      >
+                        {sub}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         )}
         {activeLeftTool === "sticky" && (
@@ -3842,6 +4289,70 @@ export function BoardPage() {
         </div>
       )}
 
+      {publishTemplateOpen && (
+        <div className="pointer-events-auto absolute inset-0 z-[60]">
+          <div className="absolute inset-0 bg-black/30 backdrop-blur-[2px]" onClick={() => setPublishTemplateOpen(false)} aria-hidden />
+          <div className="absolute left-1/2 top-1/2 w-[min(400px,calc(100%-2rem))] -translate-x-1/2 -translate-y-1/2 rounded-2xl border border-border bg-surface p-5 shadow-xl">
+            <div className="text-base font-semibold text-text-primary">Publish as Template</div>
+            <p className="mt-1 text-sm text-text-secondary">Create a snapshot of this board as a reusable template. The template will not change if you edit this board later.</p>
+            <label className="mt-4 block">
+              <span className="text-sm font-semibold text-text-primary">Template name</span>
+              <input
+                type="text"
+                value={publishTemplateName}
+                onChange={(e) => setPublishTemplateName(e.target.value)}
+                placeholder="e.g. Sprint Retro"
+                maxLength={120}
+                className="mt-2 w-full rounded-xl border border-border bg-surface px-4 py-2 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+              />
+            </label>
+            <label className="mt-3 block">
+              <span className="text-sm font-semibold text-text-secondary">Description (optional)</span>
+              <input
+                type="text"
+                value={publishTemplateDescription}
+                onChange={(e) => setPublishTemplateDescription(e.target.value)}
+                placeholder="Short description"
+                maxLength={500}
+                className="mt-2 w-full rounded-xl border border-border bg-surface px-4 py-2 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+              />
+            </label>
+            {publishTemplateNotice && <p className="mt-3 text-sm text-text-muted">{publishTemplateNotice}</p>}
+            <div className="mt-4 flex justify-end gap-2">
+              <button type="button" className={pillBtnClass} onClick={() => setPublishTemplateOpen(false)}>Cancel</button>
+              <button
+                type="button"
+                className="rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+                disabled={publishTemplateBusy || !publishTemplateName.trim() || !boardId}
+                onClick={async () => {
+                  if (!boardId || !publishTemplateName.trim()) return
+                  setPublishTemplateBusy(true)
+                  setPublishTemplateNotice(null)
+                  try {
+                    const scene = latestRef.current
+                    if (scene && typeof scene === "object") {
+                      await backendApi.saveBoardScene(boardId, { scene })
+                    }
+                    await backendApi.publishTemplate(boardId, {
+                      name: publishTemplateName.trim(),
+                      description: publishTemplateDescription.trim() || undefined,
+                    })
+                    setPublishTemplateNotice("Template published. It appears on the Create Board page.")
+                    setPublishTemplateOpen(false)
+                  } catch (e: any) {
+                    setPublishTemplateNotice(e?.message || "Failed to publish template.")
+                  } finally {
+                    setPublishTemplateBusy(false)
+                  }
+                }}
+              >
+                {publishTemplateBusy ? "Publishing…" : "Publish"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Premade Templates modal - nearly full screen, left nav + template cards */}
       {templatesModalOpen && (
         <div className="pointer-events-auto fixed inset-0 z-[60]" data-templates-modal>
@@ -3983,7 +4494,7 @@ export function BoardPage() {
         excalidrawAPI={handleExcalidrawApi}
         initialData={initialDataForExcalidraw as any}
         gridModeEnabled={effectiveGrid}
-        handleKeyboardGlobally={!aiOpen && !shareOpen && !onboardingOpen && !zoomEditing}
+        handleKeyboardGlobally={!aiOpen && !shareOpen && !onboardingOpen && !zoomEditing && !publishTemplateOpen}
         onChange={handleChange}
         UIOptions={uiOptions}
       />
@@ -4087,7 +4598,7 @@ export function BoardPage() {
                     />
                     <button
                       type="button"
-                      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary text-white hover:bg-primary/90"
+                      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg btn-gradient"
                       onClick={saveReply}
                       aria-label="Send reply"
                       title="Send"

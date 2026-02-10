@@ -1,4 +1,4 @@
-# CoLab
+# colab
 
 A minimal React application built with Vite and TypeScript.
 
@@ -10,7 +10,7 @@ Create a `.env.local` (not committed) for local development:
 VITE_API_BASE_URL=http://localhost:3001
 VITE_WS_URL=ws://localhost:3001
 
-# Optional: Firebase Analytics (values from your Firebase console)
+# Firebase (required for login/signup; optional Analytics)
 VITE_FIREBASE_API_KEY=...
 VITE_FIREBASE_AUTH_DOMAIN=...
 VITE_FIREBASE_PROJECT_ID=...
@@ -19,6 +19,11 @@ VITE_FIREBASE_MESSAGING_SENDER_ID=...
 VITE_FIREBASE_APP_ID=...
 VITE_FIREBASE_MEASUREMENT_ID=...
 ```
+
+If login or signup returns **400** from `identitytoolkit.googleapis.com`, check in [Firebase Console](https://console.firebase.google.com):
+
+1. **Authentication → Sign-in method** — Enable **Email/Password**.
+2. **Authentication → Settings → Authorized domains** — Add `localhost` (for dev) and your production domain.
 
 ## Setup
 

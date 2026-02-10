@@ -17,6 +17,7 @@ import { LoginPage } from "../pages/auth/LoginPage"
 import { SignupPage } from "../pages/auth/SignupPage"
 
 import { DashboardPage } from "../pages/app/DashboardPage"
+import { CreateBoardPage } from "../pages/app/CreateBoardPage"
 import { BoardPage } from "../pages/app/BoardPage"
 import { AccountSettingsPage } from "../pages/app/AccountSettingsPage"
 import { WorkspaceSettingsPage } from "../pages/app/WorkspaceSettingsPage"
@@ -50,6 +51,7 @@ export const router = createBrowserRouter([
     children: [
       { index: true, element: <Navigate to="/app/dashboard" replace /> },
       { path: "dashboard", element: <DashboardPage /> },
+      { path: "create-board", element: <CreateBoardPage /> },
       { path: "boards/:boardId", element: <BoardPage /> },
       { path: "workspace-settings", element: <WorkspaceSettingsPage /> },
       { path: "notifications", element: <NotificationsPage /> },

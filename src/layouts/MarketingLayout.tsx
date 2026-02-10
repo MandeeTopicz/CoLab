@@ -21,7 +21,7 @@ export function MarketingLayout() {
         <div className="flex w-full items-center justify-between gap-4 px-6 py-3 sm:px-8">
           <NavLink
             to="/"
-            className="inline-flex items-center gap-2.5 rounded-lg px-2 py-1 text-xl font-bold tracking-tight text-text-primary hover:bg-toolbar transition-colors duration-fast"
+            className="inline-flex items-center gap-2.5 rounded-lg px-2 py-1 text-xl font-bold tracking-tight text-text-primary hover:bg-toolbar transition-colors duration-fast font-sans"
           >
             <img
               src="/logo.png"
@@ -31,7 +31,7 @@ export function MarketingLayout() {
               width={28}
               height={28}
             />
-            CoLab
+            colab
           </NavLink>
 
           <div className="flex items-center gap-2">
@@ -56,7 +56,7 @@ export function MarketingLayout() {
             </NavLink>
             <NavLink
               to="/signup"
-              className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-text-inverse shadow-sm hover:bg-primary-hover active:bg-primary-active transition-colors duration-fast"
+              className="rounded-lg btn-gradient px-4 py-2 text-sm font-semibold"
             >
               Sign up
             </NavLink>
@@ -100,7 +100,7 @@ export function MarketingLayout() {
               <div className="mt-2 text-sm text-text-muted">Terms • Privacy • Cookies</div>
             </div>
           </div>
-          <div className="mt-8 text-xs text-text-muted">© {new Date().getFullYear()} CoLab</div>
+          <div className="mt-8 text-xs text-text-muted">© {new Date().getFullYear()} colab</div>
         </div>
       </footer>
     </div>

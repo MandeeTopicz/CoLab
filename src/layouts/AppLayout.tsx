@@ -33,11 +33,11 @@ export function AppLayout() {
   return (
     <div className="min-h-screen">
       {!isBoardRoute && (
-        <header className="sticky top-0 z-10 border-b border-border/80 bg-surface/90 backdrop-blur">
-          <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-3">
+        <header className="sticky top-0 z-10 w-full border-b border-border/80 bg-surface/90 backdrop-blur">
+          <div className="flex w-full items-center justify-between gap-4 px-4 py-3 sm:px-6">
             <div className="flex items-center gap-3">
               <button
-                className="inline-flex items-center gap-2.5 rounded-lg px-2 py-1 text-xl font-bold tracking-tight text-text-primary hover:bg-toolbar transition-colors duration-fast"
+                className="inline-flex items-center gap-2.5 rounded-lg px-2 py-1 text-xl font-bold tracking-tight text-text-primary hover:bg-toolbar transition-colors duration-fast font-sans"
                 type="button"
                 onClick={() => navigate("/app/dashboard")}
               >
@@ -49,14 +49,7 @@ export function AppLayout() {
                   width={28}
                   height={28}
                 />
-                CoLab
-              </button>
-              <button
-                className="hidden rounded-lg border border-border bg-surface px-3 py-2 text-sm font-semibold text-text-secondary shadow-xs hover:bg-toolbar transition-colors duration-fast md:inline-flex"
-                type="button"
-                onClick={() => navigate("/app/dashboard")}
-              >
-                Dashboard
+                colab
               </button>
             </div>
 
@@ -69,14 +62,6 @@ export function AppLayout() {
             </div>
 
             <div className="flex items-center gap-2">
-              <button
-                className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-text-inverse shadow-sm hover:bg-primary-hover active:bg-primary-active transition-colors duration-fast"
-                type="button"
-                onClick={() => navigate("/app/dashboard")}
-              >
-                Create board
-              </button>
-
               <NavLink
                 to="/app/notifications"
                 className={({ isActive }) =>
@@ -89,7 +74,7 @@ export function AppLayout() {
                 <span className="inline-flex items-center gap-2">
                   Notifications
                   {unreadCount > 0 && (
-                    <span className="inline-flex min-w-5 items-center justify-center rounded-full bg-primary px-1.5 py-0.5 text-[11px] font-bold text-text-inverse">
+                    <span className="inline-flex min-w-5 items-center justify-center rounded-full btn-gradient px-1.5 py-0.5 text-[11px] font-bold">
                       {unreadCount > 99 ? "99+" : unreadCount}
                     </span>
                   )}
@@ -130,9 +115,16 @@ export function AppLayout() {
           <Outlet />
         </main>
       ) : (
-        <div className="mx-auto grid min-h-[calc(100vh-57px)] max-w-7xl grid-cols-1 md:grid-cols-[240px_1fr]">
-          <aside className="border-b border-border/80 bg-surface px-4 py-4 md:border-b-0 md:border-r">
+        <div className="grid min-h-[calc(100vh-57px)] w-full grid-cols-1 md:grid-cols-[240px_1fr]">
+          <aside className="border-b border-border/80 bg-surface px-4 py-4 md:min-w-[240px] md:border-b-0 md:border-r">
             <nav className="flex gap-2 md:flex-col" aria-label="App navigation">
+              <button
+                type="button"
+                onClick={() => navigate("/app/create-board")}
+                className="w-full rounded-lg bg-primary px-3 py-2.5 text-center text-sm font-semibold text-white shadow-sm hover:opacity-95 transition-opacity"
+              >
+                Create board
+              </button>
               <NavLink
                 to="/app/dashboard"
                 className={({ isActive }) =>
@@ -158,7 +150,7 @@ export function AppLayout() {
             </nav>
           </aside>
 
-          <main className="px-4 py-6">
+          <main className="min-w-0 px-4 py-6 sm:px-6">
             <Outlet />
           </main>
         </div>

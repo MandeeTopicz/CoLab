@@ -18,7 +18,7 @@ export function HomePage() {
               <div className="mt-8 flex items-center justify-center">
                 <a
                   href="/signup"
-                  className="rounded-lg bg-primary px-5 py-3 text-base font-semibold text-text-inverse shadow-sm hover:bg-primary-hover active:bg-primary-active transition-colors duration-fast"
+                  className="rounded-lg btn-gradient px-5 py-3 text-base font-semibold"
                 >
                   Get Started
                 </a>

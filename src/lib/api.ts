@@ -114,6 +114,41 @@ export function useApi() {
           headers,
           body: JSON.stringify(body),
         }),
+      // Templates (published snapshots; create board from template = copy)
+      publishTemplate: (boardId: string, body: { name: string; description?: string }) =>
+        request<{ templateId: string; name: string }>(`/api/boards/${boardId}/publish-template`, {
+          method: "POST",
+          headers,
+          body: JSON.stringify(body),
+        }),
+      listTemplates: (params?: { q?: string }) => {
+        const qs = params?.q ? `?q=${encodeURIComponent(params.q)}` : ""
+        return request<{ templates: any[] }>(`/api/templates${qs}`, { method: "GET", headers })
+      },
+      listMyTemplates: () =>
+        request<{ templates: any[] }>("/api/templates/mine", { method: "GET", headers }),
+      getTemplate: (templateId: string) =>
+        request<{ template: any }>(`/api/templates/${templateId}`, { method: "GET", headers }),
+      updateTemplate: (templateId: string, body: { name?: string; description?: string }) =>
+        request<{ ok: true }>(`/api/templates/${templateId}`, {
+          method: "PATCH",
+          headers,
+          body: JSON.stringify(body),
+        }),
+      deleteTemplate: (templateId: string) =>
+        request<{ ok: true }>(`/api/templates/${templateId}`, { method: "DELETE", headers }),
+      createBoardFromTemplate: (body: { templateId: string; name: string; workspaceId: string }) =>
+        request<{ boardId: string }>("/api/boards/from-template", {
+          method: "POST",
+          headers,
+          body: JSON.stringify(body),
+        }),
+      listFavoriteTemplates: () =>
+        request<{ templates: any[] }>("/api/templates/favorites", { method: "GET", headers }),
+      addTemplateFavorite: (templateId: string) =>
+        request<{ ok: true }>(`/api/templates/${templateId}/favorite`, { method: "POST", headers }),
+      removeTemplateFavorite: (templateId: string) =>
+        request<{ ok: true }>(`/api/templates/${templateId}/favorite`, { method: "DELETE", headers }),
     }
   }, [token])
 }

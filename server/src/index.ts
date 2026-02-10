@@ -790,6 +790,206 @@ app.get("/api/workspaces/:workspaceId/boards", { preHandler: requireAuth }, asyn
   return { boards }
 })
 
+// --- Templates (published snapshots; immutable) ---
+const TEMPLATES_COLLECTION = "templates"
+const TEMPLATE_SCENE_MAX_BYTES = 900_000
+
+app.post("/api/boards/:boardId/publish-template", { preHandler: requireAuth }, async (req: any, reply) => {
+  const user = (req as AuthedRequest).user
+  const boardId = String(req.params.boardId || "")
+  const body = z.object({ name: z.string().min(1).max(120), description: z.string().max(500).optional() }).parse(req.body)
+  const db = getDb()
+  const { board, allowed } = await getBoardAndAssertAccess({ boardId, uid: user.uid })
+  if (!board || !allowed) return reply.notFound()
+  if (String(board.ownerId || "") !== user.uid) return reply.forbidden()
+  const scene = await readBoardScene(db, boardId, board) || { elements: [], appState: {}, files: {} }
+  const sceneJson = JSON.stringify(scene)
+  if (Buffer.byteLength(sceneJson, "utf8") > TEMPLATE_SCENE_MAX_BYTES)
+    return reply.status(400).send({ ok: false, error: "scene_too_large" })
+  const templateId = `tpl_${crypto.randomUUID()}`
+  const now = Date.now()
+  await db.collection(TEMPLATES_COLLECTION).doc(templateId).set({
+    templateId,
+    ownerId: user.uid,
+    ownerName: user.name || user.email || "User",
+    name: body.name.trim(),
+    description: (body.description || "").trim() || null,
+    sceneJson,
+    createdAt: now,
+    updatedAt: now,
+    aiAssisted: false,
+  })
+  return { templateId, name: body.name.trim() }
+})
+
+app.get("/api/templates", { preHandler: requireAuth }, async (req: any) => {
+  const db = getDb()
+  const q = (req.query as any)?.q
+  const query = db.collection(TEMPLATES_COLLECTION).orderBy("createdAt", "desc")
+  const snap = await query.get()
+  let list = snap.docs.map((d) => {
+    const data = d.data() as any
+    return {
+      templateId: d.id,
+      name: data.name || "Template",
+      description: data.description || null,
+      ownerId: data.ownerId,
+      ownerName: data.ownerName || "User",
+      createdAt: data.createdAt || 0,
+      aiAssisted: !!data.aiAssisted,
+    }
+  })
+  if (typeof q === "string" && q.trim()) {
+    const lower = q.trim().toLowerCase()
+    list = list.filter((t) => (t.name || "").toLowerCase().includes(lower) || (t.ownerName || "").toLowerCase().includes(lower))
+  }
+  return { templates: list }
+})
+
+app.get("/api/templates/mine", { preHandler: requireAuth }, async (req: any) => {
+  const user = (req as AuthedRequest).user
+  const db = getDb()
+  const snap = await db.collection(TEMPLATES_COLLECTION).where("ownerId", "==", user.uid).orderBy("createdAt", "desc").get()
+  const templates = snap.docs.map((d) => {
+    const data = d.data() as any
+    return { templateId: d.id, name: data.name, description: data.description || null, createdAt: data.createdAt || 0 }
+  })
+  return { templates }
+})
+
+app.get("/api/templates/:templateId", { preHandler: requireAuth }, async (req: any, reply) => {
+  const templateId = String(req.params.templateId || "")
+  if (!templateId) return reply.notFound()
+  const db = getDb()
+  const doc = await db.collection(TEMPLATES_COLLECTION).doc(templateId).get()
+  if (!doc.exists) return reply.notFound()
+  const data = doc.data() as any
+  const scene = typeof data.sceneJson === "string" ? JSON.parse(data.sceneJson) : null
+  return {
+    template: {
+      templateId: doc.id,
+      name: data.name || "Template",
+      description: data.description || null,
+      ownerId: data.ownerId,
+      ownerName: data.ownerName || "User",
+      scene,
+      createdAt: data.createdAt || 0,
+      aiAssisted: !!data.aiAssisted,
+    },
+  }
+})
+
+app.patch("/api/templates/:templateId", { preHandler: requireAuth }, async (req: any, reply) => {
+  const user = (req as AuthedRequest).user
+  const templateId = String(req.params.templateId || "")
+  const body = z.object({ name: z.string().min(1).max(120).optional(), description: z.string().max(500).optional() }).parse(req.body ?? {})
+  const db = getDb()
+  const doc = await db.collection(TEMPLATES_COLLECTION).doc(templateId).get()
+  if (!doc.exists) return reply.notFound()
+  if ((doc.data() as any).ownerId !== user.uid) return reply.forbidden()
+  const now = Date.now()
+  const update: any = { updatedAt: now }
+  if (typeof body.name === "string") update.name = body.name.trim()
+  if (typeof body.description === "string") update.description = body.description.trim() || null
+  await db.collection(TEMPLATES_COLLECTION).doc(templateId).set(update, { merge: true })
+  return { ok: true }
+})
+
+app.delete("/api/templates/:templateId", { preHandler: requireAuth }, async (req: any, reply) => {
+  const user = (req as AuthedRequest).user
+  const templateId = String(req.params.templateId || "")
+  const db = getDb()
+  const doc = await db.collection(TEMPLATES_COLLECTION).doc(templateId).get()
+  if (!doc.exists) return reply.notFound()
+  if ((doc.data() as any).ownerId !== user.uid) return reply.forbidden()
+  await db.collection(TEMPLATES_COLLECTION).doc(templateId).delete()
+  return { ok: true }
+})
+
+app.post("/api/boards/from-template", { preHandler: requireAuth }, async (req: any, reply) => {
+  const user = (req as AuthedRequest).user
+  const body = z.object({ templateId: z.string().min(1), name: z.string().min(1).max(120), workspaceId: z.string().min(1) }).parse(req.body)
+  const db = getDb()
+  const tDoc = await db.collection(TEMPLATES_COLLECTION).doc(body.templateId).get()
+  if (!tDoc.exists) return reply.notFound()
+  const t = tDoc.data() as any
+  const scene = typeof t.sceneJson === "string" ? JSON.parse(t.sceneJson) : { elements: [], appState: {}, files: {} }
+  const wsSnap = await db.collection("workspaces").doc(body.workspaceId).get()
+  if (!wsSnap.exists) return reply.notFound()
+  if ((wsSnap.data() as any).ownerId !== user.uid) return reply.forbidden()
+  const boardId = `b_${crypto.randomUUID()}`
+  const now = Date.now()
+  await writeBoardScene(db, boardId, scene, now)
+  await db.collection("boards").doc(boardId).set({
+    boardId,
+    workspaceId: body.workspaceId,
+    name: body.name.trim(),
+    ownerId: user.uid,
+    collaboratorIds: [],
+    collaboratorEmails: [],
+    createdFromTemplateId: body.templateId,
+    updatedAt: now,
+    createdAt: now,
+  })
+  return { boardId }
+})
+
+async function getFavoriteIds(db: any, uid: string): Promise<string[]> {
+  const ref = db.collection("users").doc(uid).collection("data").doc("favorites")
+  const snap = await ref.get()
+  const data = snap.exists ? (snap.data() as any) : {}
+  const ids = Array.isArray(data.templateIds) ? data.templateIds : []
+  return ids
+}
+
+app.get("/api/templates/favorites", { preHandler: requireAuth }, async (req: any) => {
+  const user = (req as AuthedRequest).user
+  const db = getDb()
+  const ids = await getFavoriteIds(db, user.uid)
+  if (ids.length === 0) return { templates: [] }
+  const templates: any[] = []
+  for (const id of ids) {
+    const doc = await db.collection(TEMPLATES_COLLECTION).doc(id).get()
+    if (!doc.exists) continue
+    const data = doc.data() as any
+    templates.push({
+      templateId: doc.id,
+      name: data.name || "Template",
+      description: data.description || null,
+      ownerId: data.ownerId,
+      ownerName: data.ownerName || "User",
+      createdAt: data.createdAt || 0,
+      aiAssisted: !!data.aiAssisted,
+    })
+  }
+  return { templates }
+})
+
+app.post("/api/templates/:templateId/favorite", { preHandler: requireAuth }, async (req: any, reply) => {
+  const user = (req as AuthedRequest).user
+  const templateId = String(req.params.templateId || "")
+  const db = getDb()
+  const tDoc = await db.collection(TEMPLATES_COLLECTION).doc(templateId).get()
+  if (!tDoc.exists) return reply.notFound()
+  const ids = await getFavoriteIds(db, user.uid)
+  if (ids.includes(templateId)) return { ok: true }
+  const ref = db.collection("users").doc(user.uid).collection("data").doc("favorites")
+  await ref.set({ templateIds: FieldValue.arrayUnion(templateId), updatedAt: Date.now() }, { merge: true })
+  return { ok: true }
+})
+
+app.delete("/api/templates/:templateId/favorite", { preHandler: requireAuth }, async (req: any, reply) => {
+  const user = (req as AuthedRequest).user
+  const templateId = String(req.params.templateId || "")
+  const db = getDb()
+  const ids = await getFavoriteIds(db, user.uid)
+  if (!ids.includes(templateId)) return { ok: true }
+  const ref = db.collection("users").doc(user.uid).collection("data").doc("favorites")
+  const next = ids.filter((id) => id !== templateId)
+  await ref.set({ templateIds: next, updatedAt: Date.now() }, { merge: true })
+  return { ok: true }
+})
+
 const wss = new WebSocketServer({ noServer: true })
 app.server.on("upgrade", (request, socket, head) => {
   try {
