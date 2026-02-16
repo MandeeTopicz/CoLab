@@ -379,6 +379,7 @@ function makeTextElement(opts: {
   verticalAlign?: "top" | "middle" | "bottom"
   opacity?: number
   autoResize?: boolean
+  containerId?: string | null
 }) {
   const base: any = makeBaseElement("text", {
     x: opts.x,
@@ -401,7 +402,7 @@ function makeTextElement(opts: {
     verticalAlign: opts.verticalAlign ?? "top",
     baseline: Math.max(1, Math.round(fontSize * 0.9)),
     lineHeight: 1.25,
-    containerId: null,
+    containerId: opts.containerId ?? null,
     autoResize: opts.autoResize !== false,
   }
 }
@@ -478,6 +479,8 @@ function makeStickyNote(
     text: "",
     fontSize: 16,
     backgroundColor: "transparent",
+    textAlign: "center",
+    verticalAlign: "middle",
   })
   return [rect, textEl]
 }
@@ -2247,6 +2250,14 @@ export function BoardPage() {
   const apiRef = useRef<any>(null)
   const rightClickStartRef = useRef<number | null>(null)
   const rightClickDurationRef = useRef<number>(0)
+  const lastPointerDownTimeRef = useRef<number>(0)
+  const panByDoubleClickRef = useRef<{
+    pointerId: number
+    startClientX: number
+    startClientY: number
+    startScrollX: number
+    startScrollY: number
+  } | null>(null)
   const [shapesOpen, setShapesOpen] = useState(false)
   const [activeLeftTool, setActiveLeftTool] = useState<string | null>(null)
   const [pencilSubTool, setPencilSubTool] = useState<"pen" | "highlighter" | "eraser" | "lasso" | null>(null)
@@ -2891,11 +2902,33 @@ export function BoardPage() {
       height: H - pad * 2,
       text: "",
       fontSize: 16,
-      backgroundColor: "transparent",
+      strokeColor: "#1f2937",
+      textAlign: "center",
+      verticalAlign: "middle",
+      autoResize: false,
+      containerId: rect.id,
     })
+    ;(rect as any).boundElements = [{ id: textEl.id, type: "text" as const }]
     const existing = api.getSceneElements() ?? []
     api.updateScene({ elements: [...existing, rect, textEl], captureUpdate: "IMMEDIATELY" })
     selectLeftTool(null)
+    const textId = textEl.id
+    requestAnimationFrame(() => {
+      const a = apiRef.current
+      if (!a?.getAppState || !a?.updateScene || !a?.getSceneElements) return
+      const elements = a.getSceneElements() ?? []
+      const addedText = elements.find((el: any) => el.id === textId && el.type === "text")
+      if (!addedText) return
+      const appState = a.getAppState()
+      a.updateScene({
+        appState: {
+          ...appState,
+          selectedElementIds: { [addedText.id]: true },
+          editingTextElement: addedText,
+        },
+        captureUpdate: "IMMEDIATELY",
+      })
+    })
   }, [stickyNoteColor])
 
   const handleContextMenuCapture = useCallback((e: React.MouseEvent) => {
@@ -2916,9 +2949,34 @@ export function BoardPage() {
   }, [])
 
   const handleCanvasPointerDown = useCallback((e: React.PointerEvent) => {
-    if (activeLeftTool !== "sticky" && activeLeftTool !== "comment") return
     const target = e.target as HTMLElement
     if (target.closest("[data-left-toolbar]") || target.closest("[data-secondary-panel]") || target.closest("[data-templates-modal]") || target.closest("[data-comment-ui]")) return
+
+    if (e.button === 0) {
+      const now = Date.now()
+      if (now - lastPointerDownTimeRef.current < 400) {
+        const api = apiRef.current
+        if (api?.getAppState && containerRef.current) {
+          const appState = api.getAppState()
+          const scrollX = typeof appState?.scrollX === "number" ? appState.scrollX : 0
+          const scrollY = typeof appState?.scrollY === "number" ? appState.scrollY : 0
+          panByDoubleClickRef.current = {
+            pointerId: e.pointerId,
+            startClientX: e.clientX,
+            startClientY: e.clientY,
+            startScrollX: scrollX,
+            startScrollY: scrollY,
+          }
+          containerRef.current.setPointerCapture(e.pointerId)
+          e.preventDefault()
+          e.stopPropagation()
+          return
+        }
+      }
+      lastPointerDownTimeRef.current = now
+    }
+
+    if (activeLeftTool !== "sticky" && activeLeftTool !== "comment") return
     const api = apiRef.current
     if (!api?.getAppState || !containerRef.current) return
     const rect = containerRef.current.getBoundingClientRect()
@@ -2943,6 +3001,30 @@ export function BoardPage() {
       setPendingCommentText("")
     }
   }, [activeLeftTool, insertStickyAtScene, pendingComment])
+
+  const handleCanvasPointerMove = useCallback((e: React.PointerEvent) => {
+    const pan = panByDoubleClickRef.current
+    if (!pan || pan.pointerId !== e.pointerId) return
+    const api = apiRef.current
+    if (!api?.getAppState || !api?.updateScene) return
+    e.preventDefault()
+    const appState = api.getAppState()
+    const zoom = typeof appState?.zoom?.value === "number" ? appState.zoom.value : 1
+    const deltaX = e.clientX - pan.startClientX
+    const deltaY = e.clientY - pan.startClientY
+    const newScrollX = pan.startScrollX - deltaX / zoom
+    const newScrollY = pan.startScrollY - deltaY / zoom
+    api.updateScene({
+      appState: { ...appState, scrollX: newScrollX, scrollY: newScrollY },
+      captureUpdate: "IMMEDIATELY",
+    })
+  }, [])
+
+  const handleCanvasPointerUp = useCallback((e: React.PointerEvent) => {
+    if (panByDoubleClickRef.current?.pointerId === e.pointerId) {
+      panByDoubleClickRef.current = null
+    }
+  }, [])
 
   const commentAuthor = authUser?.displayName ?? "You"
 
@@ -3614,6 +3696,9 @@ export function BoardPage() {
         onPointerUpCapture={handleRightClickUp}
         onContextMenuCapture={handleContextMenuCapture}
         onPointerDown={handleCanvasPointerDown}
+        onPointerMove={handleCanvasPointerMove}
+        onPointerUp={handleCanvasPointerUp}
+        onPointerCancel={handleCanvasPointerUp}
       >
       {/* Hide Excalidraw's built-in toolbars/menus (we render our own). */}
       <style>{`

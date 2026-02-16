@@ -849,11 +849,13 @@ app.get("/api/templates", { preHandler: requireAuth }, async (req: any) => {
 app.get("/api/templates/mine", { preHandler: requireAuth }, async (req: any) => {
   const user = (req as AuthedRequest).user
   const db = getDb()
-  const snap = await db.collection(TEMPLATES_COLLECTION).where("ownerId", "==", user.uid).orderBy("createdAt", "desc").get()
-  const templates = snap.docs.map((d) => {
-    const data = d.data() as any
-    return { templateId: d.id, name: data.name, description: data.description || null, createdAt: data.createdAt || 0 }
-  })
+  const snap = await db.collection(TEMPLATES_COLLECTION).where("ownerId", "==", user.uid).get()
+  const templates = snap.docs
+    .map((d) => {
+      const data = d.data() as any
+      return { templateId: d.id, name: data.name, description: data.description || null, createdAt: data.createdAt || 0 }
+    })
+    .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
   return { templates }
 })
 

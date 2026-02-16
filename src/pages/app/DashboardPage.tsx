@@ -21,6 +21,7 @@ export function DashboardPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [newBoardName, setNewBoardName] = useState("")
+  const [boardSearch, setBoardSearch] = useState("")
   const [myTemplates, setMyTemplates] = useState<Array<{ templateId: string; name: string; description?: string | null }>>([])
 
   const isSharedSelected = workspaceId === SHARED_WORKSPACE_ID
@@ -31,7 +32,14 @@ export function DashboardPage() {
         : workspaces.find((w) => w.workspaceId === workspaceId) || null,
     [workspaces, workspaceId, isSharedSelected]
   )
-  const displayBoards = isSharedSelected ? sharedBoards : boards
+  const allDisplayBoards = isSharedSelected ? sharedBoards : boards
+  const searchLower = boardSearch.trim().toLowerCase()
+  const displayBoards = searchLower
+    ? allDisplayBoards.filter((b) => b.name.toLowerCase().includes(searchLower))
+    : allDisplayBoards
+  const filteredSharedBoards = searchLower
+    ? sharedBoards.filter((b) => b.name.toLowerCase().includes(searchLower))
+    : sharedBoards
 
   useEffect(() => {
     let alive = true
@@ -123,6 +131,17 @@ export function DashboardPage() {
       <div className="min-w-0">
       <h1 className="text-2xl font-semibold text-text-primary">Dashboard</h1>
 
+      <div className="mt-3">
+        <input
+          type="search"
+          value={boardSearch}
+          onChange={(e) => setBoardSearch(e.target.value)}
+          placeholder="Search boards..."
+          aria-label="Search boards"
+          className="w-full max-w-md rounded-xl border border-border bg-surface px-3 py-2 text-sm text-text-primary placeholder:text-text-muted shadow-xs focus:outline-none focus:ring-2 focus:ring-primary/30"
+        />
+      </div>
+
       {error && (
         <div className="mt-4 rounded-xl border border-danger/30 bg-danger/5 p-3 text-sm text-danger">
           {error}
@@ -201,9 +220,11 @@ export function DashboardPage() {
         ))}
         {displayBoards.length === 0 && !(isSharedSelected && sharedError) && (
           <div className="text-sm text-text-muted">
-            {isSharedSelected
-              ? "No boards have been shared with you yet."
-              : "No boards yet — create one above."}
+            {searchLower
+              ? "No matching boards."
+              : isSharedSelected
+                ? "No boards have been shared with you yet."
+                : "No boards yet — create one above."}
           </div>
         )}
       </div>
@@ -213,7 +234,7 @@ export function DashboardPage() {
           <div className="text-sm font-semibold text-text-primary">Shared with you</div>
           {sharedError && <div className="mt-2 text-sm text-danger">{sharedError}</div>}
           <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {sharedBoards.map((b) => (
+            {filteredSharedBoards.map((b) => (
               <Link
                 key={b.boardId}
                 to={`/app/boards/${b.boardId}`}
@@ -225,8 +246,10 @@ export function DashboardPage() {
                 </div>
               </Link>
             ))}
-            {sharedBoards.length === 0 && !sharedError && (
-              <div className="text-sm text-text-muted">No boards have been shared with you yet.</div>
+            {filteredSharedBoards.length === 0 && !sharedError && (
+              <div className="text-sm text-text-muted">
+                {sharedBoards.length === 0 ? "No boards have been shared with you yet." : "No matching boards."}
+              </div>
             )}
           </div>
         </div>
